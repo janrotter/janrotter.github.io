@@ -1,0 +1,26 @@
+baseURL = 'https://janrotter.github.io/'
+languageCode = 'en-us'
+title = 'Jan Rotter Blog'
+theme = "LoveIt"
+
+[author]
+  name = "Jan Rotter"
+  email = ""
+  link = ""
+
+[params.header.title]
+  name = "MiniBlog"
+
+[params.home.profile]
+  enable = false
+  title = "Hello!"
+  subtitle = "Good to see you here!"
+  typeit = false
+
+[params.page.share]
+  Line = false
+  Weibo = false
+
+[params]
+  defaultTheme = "light"
+
