@@ -1,0 +1,416 @@
+<!doctype html><html lang=en-us><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><meta name=robots content="noodp"><title>My Basic MikroTik hEX S Setup - Jan Rotter Blog</title><meta name=Description content="This is my cool site"><meta property="og:title" content="My Basic MikroTik hEX S Setup"><meta property="og:description" content="How I configured a MikroTik hEX S router with VLANs to separate different parts of my home network."><meta property="og:type" content="article"><meta property="og:url" content="https://janrotter.github.io/posts/mikrotik/"><meta property="article:section" content="posts"><meta property="article:published_time" content="2022-08-13T21:53:04+02:00"><meta property="article:modified_time" content="2022-08-13T21:53:04+02:00"><meta property="og:site_name" content="My cool site"><meta name=twitter:card content="summary"><meta name=twitter:title content="My Basic MikroTik hEX S Setup"><meta name=twitter:description content="How I configured a MikroTik hEX S router with VLANs to separate different parts of my home network."><meta name=application-name content="My cool site"><meta name=apple-mobile-web-app-title content="My cool site"><meta name=theme-color content="#ffffff"><meta name=msapplication-TileColor content="#da532c"><link rel="shortcut icon" type=image/x-icon href=/favicon.ico><link rel=icon type=image/png sizes=32x32 href=/favicon-32x32.png><link rel=icon type=image/png sizes=16x16 href=/favicon-16x16.png><link rel=apple-touch-icon sizes=180x180 href=/apple-touch-icon.png><link rel=mask-icon href=/safari-pinned-tab.svg color=#5bbad5><link rel=manifest href=/site.webmanifest><link rel=canonical href=https://janrotter.github.io/posts/mikrotik/><link rel=next href=https://janrotter.github.io/posts/cant_reach_docker_container/><link rel=stylesheet href=/css/style.min.css><link rel=preload href=https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.1.1/css/all.min.css as=style onload='this.onload=null,this.rel="stylesheet"'><noscript><link rel=stylesheet href=https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.1.1/css/all.min.css></noscript><link rel=preload href=https://cdn.jsdelivr.net/npm/animate.css@4.1.1/animate.min.css as=style onload='this.onload=null,this.rel="stylesheet"'><noscript><link rel=stylesheet href=https://cdn.jsdelivr.net/npm/animate.css@4.1.1/animate.min.css></noscript><script type=application/ld+json>{"@context":"http://schema.org","@type":"BlogPosting","headline":"My Basic MikroTik hEX S Setup","inLanguage":"en-us","mainEntityOfPage":{"@type":"WebPage","@id":"https:\/\/janrotter.github.io\/posts\/mikrotik\/"},"genre":"posts","keywords":"mikrotik, homelab, vlans","wordcount":3369,"url":"https:\/\/janrotter.github.io\/posts\/mikrotik\/","datePublished":"2022-08-13T21:53:04+02:00","dateModified":"2022-08-13T21:53:04+02:00","publisher":{"@type":"Organization","name":""},"author":{"@type":"Person","name":"Jan Rotter"},"description":""}</script></head><body data-header-desktop=fixed data-header-mobile=auto><script type=text/javascript>(window.localStorage&&localStorage.getItem("theme")?localStorage.getItem("theme")==="dark":"light"==="auto"?window.matchMedia("(prefers-color-scheme: dark)").matches:"light"==="dark")&&document.body.setAttribute("theme","dark")</script><div id=mask></div><div class=wrapper><header class=desktop id=header-desktop><div class=header-wrapper><div class=header-title><a href=/ title="Jan Rotter Blog">MiniBlog</a></div><div class=menu><div class=menu-inner><a href=javascript:void(0); class="menu-item theme-switch" title="Switch Theme"><i class="fas fa-adjust fa-fw" aria-hidden=true></i></a></div></div></div></header><header class=mobile id=header-mobile><div class=header-container><div class=header-wrapper><div class=header-title><a href=/ title="Jan Rotter Blog">MiniBlog</a></div><div class=menu-toggle id=menu-toggle-mobile><span></span><span></span><span></span></div></div><div class=menu id=menu-mobile><a href=javascript:void(0); class="menu-item theme-switch" title="Switch Theme"><i class="fas fa-adjust fa-fw" aria-hidden=true></i></a></div></div></header><main class=main><div class=container><div class=toc id=toc-auto><h2 class=toc-title>Contents</h2><div class=toc-content id=toc-content-auto></div></div><article class="page single"><h1 class="single-title animate__animated animate__flipInX">My Basic MikroTik hEX S Setup</h1><div class=post-meta><div class=post-meta-line><span class=post-author><a href=/ title=Author rel=author class=author><i class="fas fa-user-circle fa-fw" aria-hidden=true></i>Jan Rotter</a></span></div><div class=post-meta-line><i class="far fa-calendar-alt fa-fw" aria-hidden=true></i>&nbsp;<time datetime=2022-08-13>2022-08-13</time>&nbsp;<i class="fas fa-pencil-alt fa-fw" aria-hidden=true></i>&nbsp;3369 words&nbsp;
+<i class="far fa-clock fa-fw" aria-hidden=true></i>&nbsp;16 minutes&nbsp;</div></div><div class="details toc" id=toc-static data-kept><div class="details-summary toc-title"><span>Contents</span>
+<span><i class="details-icon fas fa-angle-right" aria-hidden=true></i></span></div><div class="details-content toc-content" id=toc-content-static><nav id=TableOfContents><ul><li><a href=#objectives>Objectives</a></li><li><a href=#default-configuration-or-where-we-start-from>Default configuration (or where we start from)</a></li><li><a href=#hardening-the-router>Hardening the router</a></li><li><a href=#in-case-something-goes-wrong>In case something goes wrong&mldr;</a></li><li><a href=#management-port-setup>Management port setup</a></li><li><a href=#default-config-cleanup>Default config cleanup</a></li><li><a href=#vlans>VLANs</a></li><li><a href=#filtering-the-traffic>Filtering the traffic</a></li><li><a href=#dns-haiku>DNS Haiku</a></li><li><a href=#summary>Summary</a></li></ul></nav></div></div><div class=content id=content><p>Once I began working on my homelab, I realised that my trivial network setup
+wouldn&rsquo;t meet my needs anymore and it needs to be improved.</p><p>Below I&rsquo;ll describe how I segmented the network to restrict access to different
+resources for my home users using a MikroTik hEX S router.</p><h2 id=objectives>Objectives</h2><p>The home network can be viewed from two angles. One is their users and their
+needs. Apart from the fully trusted family members, there are guests that
+simply need the internet access over WiFi and Work From Home users, that would
+like to reach the internet, but could also use selected shared resources,
+e.g. a printer.</p><p>The second point of view could from the perspective of the resources that
+should be accessible to their users. Here we have the aforementioned printer,
+but also file sharing services, git hosting and possibly others. Some of them
+might contain sensitive data and thus access to them should be restricted.</p><p>In my case, different user groups and shared network resource types will be
+placed in separate VLANs and the router will be configured to allow only the
+necessary traffic between them. There is no need for the user groups to talk
+with eachother, so that will be blocked.</p><p>The end result should look more or less like this:</p><div class="goat svg-container"><svg xmlns="http://www.w3.org/2000/svg" font-family="Menlo,Lucida Console,monospace" viewBox="0 0 656 297"><g transform="translate(8,16)"><path d="M32 32h72" fill="none" stroke="currentcolor"/><path d="M112 48H288" fill="none" stroke="currentcolor"/><path d="M32 64h72" fill="none" stroke="currentcolor"/><path d="M32 96H192" fill="none" stroke="currentcolor"/><path d="M2e2 112h88" fill="none" stroke="currentcolor"/><path d="M32 128H192" fill="none" stroke="currentcolor"/><path d="M112 160H280" fill="none" stroke="currentcolor"/><path d="M296 160h72" fill="none" stroke="currentcolor"/><path d="M32 192H2e2" fill="none" stroke="currentcolor"/><path d="M208 208h80" fill="none" stroke="currentcolor"/><path d="M32 224H2e2" fill="none" stroke="currentcolor"/><path d="M112 256H408" fill="none" stroke="currentcolor"/><path d="M80 272H496" fill="none" stroke="currentcolor"/><path d="M32 32V64" fill="none" stroke="currentcolor"/><path d="M32 96v32" fill="none" stroke="currentcolor"/><path d="M32 192v32" fill="none" stroke="currentcolor"/><path d="M80 240v32" fill="none" stroke="currentcolor"/><path d="M104 32V64" fill="none" stroke="currentcolor"/><path d="M112 144v16" fill="none" stroke="currentcolor"/><path d="M112 240v16" fill="none" stroke="currentcolor"/><path d="M192 96v32" fill="none" stroke="currentcolor"/><path d="M2e2 192v32" fill="none" stroke="currentcolor"/><path d="M288 16V48" fill="none" stroke="currentcolor"/><path d="M288 48v64" fill="none" stroke="currentcolor"/><path d="M288 112v96" fill="none" stroke="currentcolor"/><path d="M408 176v80" fill="none" stroke="currentcolor"/><path d="M80 232v8" fill="none" stroke="currentcolor"/><path d="M112 136v8" fill="none" stroke="currentcolor"/><path d="M112 232v8" fill="none" stroke="currentcolor"/><text text-anchor="middle" x="48" y="52" fill="currentcolor" style="font-size:1em">G</text><text text-anchor="middle" x="48" y="116" fill="currentcolor" style="font-size:1em">W</text><text text-anchor="middle" x="48" y="212" fill="currentcolor" style="font-size:1em">T</text><text text-anchor="middle" x="56" y="52" fill="currentcolor" style="font-size:1em">u</text><text text-anchor="middle" x="56" y="116" fill="currentcolor" style="font-size:1em">o</text><text text-anchor="middle" x="56" y="212" fill="currentcolor" style="font-size:1em">r</text><text text-anchor="middle" x="64" y="52" fill="currentcolor" style="font-size:1em">e</text><text text-anchor="middle" x="64" y="116" fill="currentcolor" style="font-size:1em">r</text><text text-anchor="middle" x="64" y="212" fill="currentcolor" style="font-size:1em">u</text><text text-anchor="middle" x="72" y="52" fill="currentcolor" style="font-size:1em">s</text><text text-anchor="middle" x="72" y="116" fill="currentcolor" style="font-size:1em">k</text><text text-anchor="middle" x="72" y="212" fill="currentcolor" style="font-size:1em">s</text><text text-anchor="middle" x="80" y="52" fill="currentcolor" style="font-size:1em">t</text><text text-anchor="middle" x="80" y="116" fill="currentcolor" style="font-size:1em">(</text><text text-anchor="middle" x="80" y="212" fill="currentcolor" style="font-size:1em">t</text><text text-anchor="middle" x="88" y="52" fill="currentcolor" style="font-size:1em">s</text><text text-anchor="middle" x="88" y="116" fill="currentcolor" style="font-size:1em">e</text><text text-anchor="middle" x="88" y="212" fill="currentcolor" style="font-size:1em">e</text><text text-anchor="middle" x="96" y="116" fill="currentcolor" style="font-size:1em">r</text><text text-anchor="middle" x="96" y="212" fill="currentcolor" style="font-size:1em">d</text><text text-anchor="middle" x="104" y="116" fill="currentcolor" style="font-size:1em">s</text><text text-anchor="middle" x="112" y="116" fill="currentcolor" style="font-size:1em">)</text><text text-anchor="middle" x="112" y="212" fill="currentcolor" style="font-size:1em">H</text><text text-anchor="middle" x="120" y="116" fill="currentcolor" style="font-size:1em">F</text><text text-anchor="middle" x="120" y="212" fill="currentcolor" style="font-size:1em">o</text><text text-anchor="middle" x="128" y="116" fill="currentcolor" style="font-size:1em">r</text><text text-anchor="middle" x="128" y="212" fill="currentcolor" style="font-size:1em">m</text><text text-anchor="middle" x="136" y="116" fill="currentcolor" style="font-size:1em">o</text><text text-anchor="middle" x="136" y="212" fill="currentcolor" style="font-size:1em">e</text><text text-anchor="middle" x="144" y="116" fill="currentcolor" style="font-size:1em">m</text><text text-anchor="middle" x="152" y="116" fill="currentcolor" style="font-size:1em">H</text><text text-anchor="middle" x="152" y="212" fill="currentcolor" style="font-size:1em">U</text><text text-anchor="middle" x="160" y="116" fill="currentcolor" style="font-size:1em">o</text><text text-anchor="middle" x="160" y="212" fill="currentcolor" style="font-size:1em">s</text><text text-anchor="middle" x="168" y="116" fill="currentcolor" style="font-size:1em">m</text><text text-anchor="middle" x="168" y="212" fill="currentcolor" style="font-size:1em">e</text><text text-anchor="middle" x="176" y="116" fill="currentcolor" style="font-size:1em">e</text><text text-anchor="middle" x="176" y="212" fill="currentcolor" style="font-size:1em">r</text><text text-anchor="middle" x="184" y="212" fill="currentcolor" style="font-size:1em">s</text><text text-anchor="middle" x="256" y="4" fill="currentcolor" style="font-size:1em">I</text><text text-anchor="middle" x="264" y="4" fill="currentcolor" style="font-size:1em">n</text><text text-anchor="middle" x="272" y="4" fill="currentcolor" style="font-size:1em">t</text><text text-anchor="middle" x="280" y="4" fill="currentcolor" style="font-size:1em">e</text><text text-anchor="middle" x="288" y="4" fill="currentcolor" style="font-size:1em">r</text><text text-anchor="middle" x="296" y="4" fill="currentcolor" style="font-size:1em">n</text><text text-anchor="middle" x="304" y="4" fill="currentcolor" style="font-size:1em">e</text><text text-anchor="middle" x="312" y="4" fill="currentcolor" style="font-size:1em">t</text><text text-anchor="middle" x="384" y="164" fill="currentcolor" style="font-size:1em">P</text><text text-anchor="middle" x="392" y="164" fill="currentcolor" style="font-size:1em">r</text><text text-anchor="middle" x="400" y="164" fill="currentcolor" style="font-size:1em">i</text><text text-anchor="middle" x="408" y="164" fill="currentcolor" style="font-size:1em">n</text><text text-anchor="middle" x="416" y="164" fill="currentcolor" style="font-size:1em">t</text><text text-anchor="middle" x="424" y="164" fill="currentcolor" style="font-size:1em">e</text><text text-anchor="middle" x="432" y="164" fill="currentcolor" style="font-size:1em">r</text><text text-anchor="middle" x="512" y="276" fill="currentcolor" style="font-size:1em">H</text><text text-anchor="middle" x="520" y="276" fill="currentcolor" style="font-size:1em">o</text><text text-anchor="middle" x="528" y="276" fill="currentcolor" style="font-size:1em">m</text><text text-anchor="middle" x="536" y="276" fill="currentcolor" style="font-size:1em">e</text><text text-anchor="middle" x="544" y="276" fill="currentcolor" style="font-size:1em">L</text><text text-anchor="middle" x="552" y="276" fill="currentcolor" style="font-size:1em">a</text><text text-anchor="middle" x="560" y="276" fill="currentcolor" style="font-size:1em">b</text></g></svg></div><p>The configuration will be done in the terminal. This will make it easier for me
+to understand the config export and version it properly in git.</p><h2 id=default-configuration-or-where-we-start-from>Default configuration (or where we start from)</h2><p>The first time setup is described in detail in the <a href=https://wiki.mikrotik.com/wiki/Manual:First_time_startup target=_blank rel="noopener noreffer">MikroTik
+wiki</a>.</p><p>Basically, for the hEX S, the <code>ether2</code>-<code>ether5</code> ports are connected into a bridge (named <code>bridge</code>).
+The DHCP server is enabled and gives out IP addresses in the <code>192.168.88.0/24</code>
+network, with the <code>192.168.88.1</code> being the address of the hEX S itself.</p><p>The Web UI is available under <a href=http://192.168.88.1 target=_blank rel="noopener noreffer">http://192.168.88.1</a>. The
+default username is <code>admin</code> with no password. You can also ssh into the box
+with <code>ssh 192.168.88.1 -l admin</code></p><p>Running <code>/export</code> in the routers terminal will pring out the current configuration.</p><details><summary>Click to see the default config of my hEX S</summary><pre tabindex=0><code># aug/15/2022 xx:xx:xx by RouterOS 7.4.1
+# software id = BLFX-WCHT
+#
+# model = RB760iGS
+# serial number = XXXXXXXXXXXX
+/interface bridge
+add admin-mac=xx:xx:xx:xx:xx:xx auto-mac=no comment=defconf name=bridge
+/interface list
+add comment=defconf name=WAN
+add comment=defconf name=LAN
+/interface wireless security-profiles
+set [ find default=yes ] supplicant-identity=MikroTik
+/ip hotspot profile
+set [ find default=yes ] html-directory=hotspot
+/ip pool
+add name=default-dhcp ranges=192.168.88.10-192.168.88.254
+/ip dhcp-server
+add address-pool=default-dhcp interface=bridge name=defconf
+/port
+set 0 name=serial0
+/interface bridge port
+add bridge=bridge comment=defconf interface=ether2
+add bridge=bridge comment=defconf interface=ether3
+add bridge=bridge comment=defconf interface=ether4
+add bridge=bridge comment=defconf interface=ether5
+add bridge=bridge comment=defconf interface=sfp1
+/ip neighbor discovery-settings
+set discover-interface-list=LAN
+/interface list member
+add comment=defconf interface=bridge list=LAN
+add comment=defconf interface=ether1 list=WAN
+/ip address
+add address=192.168.88.1/24 comment=defconf interface=bridge network=192.168.88.0
+/ip dhcp-client
+add comment=defconf interface=ether1
+/ip dhcp-server network
+add address=192.168.88.0/24 comment=defconf dns-server=192.168.88.1 gateway=192.168.88.1
+/ip dns
+set allow-remote-requests=yes
+/ip dns static
+add address=192.168.88.1 comment=defconf name=router.lan
+/ip firewall filter
+add action=accept chain=input comment=&#34;defconf: accept established,related,untracked&#34; connection-state=established,related,untracked
+add action=drop chain=input comment=&#34;defconf: drop invalid&#34; connection-state=invalid
+add action=accept chain=input comment=&#34;defconf: accept ICMP&#34; protocol=icmp
+add action=accept chain=input comment=&#34;defconf: accept to local loopback (for CAPsMAN)&#34; dst-address=127.0.0.1
+add action=drop chain=input comment=&#34;defconf: drop all not coming from LAN&#34; in-interface-list=!LAN
+add action=accept chain=forward comment=&#34;defconf: accept in ipsec policy&#34; ipsec-policy=in,ipsec
+add action=accept chain=forward comment=&#34;defconf: accept out ipsec policy&#34; ipsec-policy=out,ipsec
+add action=fasttrack-connection chain=forward comment=&#34;defconf: fasttrack&#34; connection-state=established,related hw-offload=yes
+add action=accept chain=forward comment=&#34;defconf: accept established,related, untracked&#34; connection-state=established,related,untracked
+add action=drop chain=forward comment=&#34;defconf: drop invalid&#34; connection-state=invalid
+add action=drop chain=forward comment=&#34;defconf: drop all from WAN not DSTNATed&#34; connection-nat-state=!dstnat connection-state=new in-interface-list=WAN
+/ip firewall nat
+add action=masquerade chain=srcnat comment=&#34;defconf: masquerade&#34; ipsec-policy=out,none out-interface-list=WAN
+/ipv6 firewall address-list
+add address=::/128 comment=&#34;defconf: unspecified address&#34; list=bad_ipv6
+add address=::1/128 comment=&#34;defconf: lo&#34; list=bad_ipv6
+add address=fec0::/10 comment=&#34;defconf: site-local&#34; list=bad_ipv6
+add address=::ffff:0.0.0.0/96 comment=&#34;defconf: ipv4-mapped&#34; list=bad_ipv6
+add address=::/96 comment=&#34;defconf: ipv4 compat&#34; list=bad_ipv6
+add address=100::/64 comment=&#34;defconf: discard only &#34; list=bad_ipv6
+add address=2001:db8::/32 comment=&#34;defconf: documentation&#34; list=bad_ipv6
+add address=2001:10::/28 comment=&#34;defconf: ORCHID&#34; list=bad_ipv6
+add address=3ffe::/16 comment=&#34;defconf: 6bone&#34; list=bad_ipv6
+/ipv6 firewall filter
+add action=accept chain=input comment=&#34;defconf: accept established,related,untracked&#34; connection-state=established,related,untracked
+add action=drop chain=input comment=&#34;defconf: drop invalid&#34; connection-state=invalid
+add action=accept chain=input comment=&#34;defconf: accept ICMPv6&#34; protocol=icmpv6
+add action=accept chain=input comment=&#34;defconf: accept UDP traceroute&#34; port=33434-33534 protocol=udp
+add action=accept chain=input comment=&#34;defconf: accept DHCPv6-Client prefix delegation.&#34; dst-port=546 protocol=udp src-address=fe80::/10
+add action=accept chain=input comment=&#34;defconf: accept IKE&#34; dst-port=500,4500 protocol=udp
+add action=accept chain=input comment=&#34;defconf: accept ipsec AH&#34; protocol=ipsec-ah
+add action=accept chain=input comment=&#34;defconf: accept ipsec ESP&#34; protocol=ipsec-esp
+add action=accept chain=input comment=&#34;defconf: accept all that matches ipsec policy&#34; ipsec-policy=in,ipsec
+add action=drop chain=input comment=&#34;defconf: drop everything else not coming from LAN&#34; in-interface-list=!LAN
+add action=accept chain=forward comment=&#34;defconf: accept established,related,untracked&#34; connection-state=established,related,untracked
+add action=drop chain=forward comment=&#34;defconf: drop invalid&#34; connection-state=invalid
+add action=drop chain=forward comment=&#34;defconf: drop packets with bad src ipv6&#34; src-address-list=bad_ipv6
+add action=drop chain=forward comment=&#34;defconf: drop packets with bad dst ipv6&#34; dst-address-list=bad_ipv6
+add action=drop chain=forward comment=&#34;defconf: rfc4890 drop hop-limit=1&#34; hop-limit=equal:1 protocol=icmpv6
+add action=accept chain=forward comment=&#34;defconf: accept ICMPv6&#34; protocol=icmpv6
+add action=accept chain=forward comment=&#34;defconf: accept HIP&#34; protocol=139
+add action=accept chain=forward comment=&#34;defconf: accept IKE&#34; dst-port=500,4500 protocol=udp
+add action=accept chain=forward comment=&#34;defconf: accept ipsec AH&#34; protocol=ipsec-ah
+add action=accept chain=forward comment=&#34;defconf: accept ipsec ESP&#34; protocol=ipsec-esp
+add action=accept chain=forward comment=&#34;defconf: accept all that matches ipsec policy&#34; ipsec-policy=in,ipsec
+add action=drop chain=forward comment=&#34;defconf: drop everything else not coming from LAN&#34; in-interface-list=!LAN
+/system clock
+set time-zone-name=Europe/Warsaw
+/system routerboard settings
+set silent-boot=yes
+/tool mac-server
+set allowed-interface-list=LAN
+/tool mac-server mac-winbox
+set allowed-interface-list=LAN
+</code></pre></details><blockquote><p><strong>Note:</strong> It might be a good idea to put the config export into a git repository and keep it up to date there.</p></blockquote><p>I&rsquo;ll be starting off with this default setup and modifying it to meet my needs.
+With that approach, I start with something that already works and apply changes that are easy for me to understand.</p><h2 id=hardening-the-router>Hardening the router</h2><p>The default setup is insecure. Please follow the <a href=https://wiki.mikrotik.com/wiki/Manual:Securing_Your_Router target=_blank rel="noopener noreffer">hardening
+guide</a> or at the very least change the <code>admin</code> user password with:</p><pre tabindex=0><code>/user set [find name=admin] password=CorrectHorseBatteryStaple
+</code></pre><p>Check out <a href=https://xkcd.com/936/ target=_blank rel="noopener noreffer">this xkcd comic</a> if you aren&rsquo;t familiar with the <code>correct horse battery staple</code>.</p><h2 id=in-case-something-goes-wrong>In case something goes wrong&mldr;</h2><p>In order to go back to the initial configuration, you can either run <code>/system reset-configuration</code> in the router terminal or follow this
+<a href=https://wiki.mikrotik.com/wiki/Manual:Reset target=_blank rel="noopener noreffer">guide</a>.</p><h2 id=management-port-setup>Management port setup</h2><p>I&rsquo;ll begin by configuring a dedicated management port to avoid being
+disconnected from the router during the configuration and to make it easy for
+me to access it later if something goes wrong.</p><p>In my case, the management port will be <code>ether2</code>. Make sure you are connected to one of the other LAN ports and then remove <code>ether2</code> from the bridge:</p><pre tabindex=0><code>/interface/bridge/port/remove [find interface=ether2]
+</code></pre><p>Add an IP address to that interface:</p><pre tabindex=0><code>/ip/address/add interface=ether2 address=192.168.0.1 netmask=255.255.255.0
+</code></pre><p>and create an IP address pool to be given out by the DHCP server:</p><pre tabindex=0><code>/ip/pool/add name=mgmt-dhcp ranges=192.168.0.2-192.168.0.254
+</code></pre><p>as well as the DHCP network:</p><pre tabindex=0><code>/ip/dhcp-server/network/add address=192.168.0.0/24 comment=mgmt
+</code></pre><p>followed by configuring the DHCP server itself:</p><pre tabindex=0><code>/ip/dhcp-server/add interface=ether2 address-pool=mgmt-dhcp name=mgmt-dhcp
+</code></pre><p>Is that all? No. Let&rsquo;s take a look at the firewall rules:</p><pre tabindex=0><code>[admin@MikroTik] &gt; /ip/firewall/filter/print chain=input
+Flags: X - disabled, I - invalid; D - dynamic 
+ 0    ;;; defconf: accept established,related,untracked
+      chain=input action=accept connection-state=established,related,untracked 
+
+ 1    ;;; defconf: drop invalid
+      chain=input action=drop connection-state=invalid 
+
+ 2    ;;; defconf: accept ICMP
+      chain=input action=accept protocol=icmp 
+
+ 3    ;;; defconf: accept to local loopback (for CAPsMAN)
+      chain=input action=accept dst-address=127.0.0.1 
+
+ 4    ;;; defconf: drop all not coming from LAN
+      chain=input action=drop in-interface-list=!LAN 
+[admin@MikroTik] &gt; 
+</code></pre><p>The LAN interface list contains the <code>bridge</code> interface:</p><pre tabindex=0><code>[admin@MikroTik] &gt; /interface/list/member/print 
+Columns: LIST, INTERFACE
+# LIST  INTERFACE
+;;; defconf
+0 LAN   bridge   
+;;; defconf
+1 WAN   ether1   
+[admin@MikroTik] &gt;
+</code></pre><p>As I removed the <code>ether2</code> from the <code>bridge</code>, the incoming traffic from that interface will fall into the 4th firewall rule and be dropped.</p><p>In order to fix that, add a new rule that explicitly allows access from the <code>ether2</code>:</p><pre tabindex=0><code>/ip/firewall/filter/add chain=input action=accept in-interface=ether2 place-before=4
+</code></pre><blockquote><p><strong>Note:</strong> In MikroTik CLI temporary numeric item identifiers are assigned after the <code>print</code> command and are valid until the next <code>print</code>. Here the <code>4</code> is used because that&rsquo;s what was returned in the print above.</p></blockquote><p>It should be safe now to connect to the <code>ether2</code> port and continue the configuration from there. Please note that it uses a different IP address, so you need to connect to <code>192.168.0.1</code> instead of the default IP address that was used before.</p><h2 id=default-config-cleanup>Default config cleanup</h2><p>First, let&rsquo;s remove things from the default config that we won&rsquo;t need anymore.</p><p>I&rsquo;m connected through the dedicated management port now, so I can setup the
+bridge without worrying about losing the connection with the router.</p><p>DHCP server on the <code>bridge</code> interface? Not needed anymore, there&rsquo;ll be a
+separate DHCP server for each VLAN. Remove it and the related resources:</p><pre tabindex=0><code>/ip/dhcp-server/remove [find name=defconf]
+/ip/pool/remove [find name=default-dhcp]
+/ip/dhcp-server/network/remove [find comment=defconf]
+</code></pre><p>The IP address of the <code>bridge</code> and the DNS entry pointing to it are also to be removed:</p><pre tabindex=0><code>/ip/address/remove [find comment=defconf]
+/ip/dns/static/remove [find comment=defconf]
+</code></pre><h2 id=vlans>VLANs</h2><p>As I understood from the <a href=https://help.mikrotik.com/docs/display/ROS/Layer2+misconfiguration target=_blank rel="noopener noreffer">L2
+misconfiguration</a>
+and the <a href=https://help.mikrotik.com/docs/display/ROS/Bridge+VLAN+Table target=_blank rel="noopener noreffer">Bridge VLAN
+Table</a> pages of
+the RouterOS documentation, the <a href=https://help.mikrotik.com/docs/display/ROS/Bridging+and+Switching#BridgingandSwitching-BridgeVLANFiltering target=_blank rel="noopener noreffer">Bridge VLAN
+Filtering</a>
+is the way to go in order to setup the VLANs and the inter-VLAN routing.</p><p>With RouterOS v7 this is also <a href=https://help.mikrotik.com/docs/display/ROS/Bridging+and+Switching#BridgingandSwitching-BridgeVLANFiltering target=_blank rel="noopener noreffer">hardware accelerated on hEX
+S</a>,
+so make sure you upgrade the OS.</p><p>Let&rsquo;s begin by assigning VLAN IDs for the groups mentioned above:</p><div class="goat svg-container"><svg xmlns="http://www.w3.org/2000/svg" font-family="Menlo,Lucida Console,monospace" viewBox="0 0 872 249"><g transform="translate(8,16)"><path d="M272 0h88" fill="none" stroke="currentcolor"/><path d="M360 0h80" fill="none" stroke="currentcolor"/><path d="M272 64h88" fill="none" stroke="currentcolor"/><path d="M360 64h80" fill="none" stroke="currentcolor"/><path d="M272 96h88" fill="none" stroke="currentcolor"/><path d="M360 96h80" fill="none" stroke="currentcolor"/><path d="M272 128h88" fill="none" stroke="currentcolor"/><path d="M360 128h80" fill="none" stroke="currentcolor"/><path d="M272 160h88" fill="none" stroke="currentcolor"/><path d="M360 160h80" fill="none" stroke="currentcolor"/><path d="M272 192h88" fill="none" stroke="currentcolor"/><path d="M360 192h80" fill="none" stroke="currentcolor"/><path d="M272 224h88" fill="none" stroke="currentcolor"/><path d="M360 224h80" fill="none" stroke="currentcolor"/><path d="M272 0V32" fill="none" stroke="currentcolor"/><path d="M272 32V64" fill="none" stroke="currentcolor"/><path d="M272 64V96" fill="none" stroke="currentcolor"/><path d="M272 96v32" fill="none" stroke="currentcolor"/><path d="M272 128v32" fill="none" stroke="currentcolor"/><path d="M272 160v32" fill="none" stroke="currentcolor"/><path d="M272 192v32" fill="none" stroke="currentcolor"/><path d="M360 0V32" fill="none" stroke="currentcolor"/><path d="M360 32V64" fill="none" stroke="currentcolor"/><path d="M360 64V96" fill="none" stroke="currentcolor"/><path d="M360 96v32" fill="none" stroke="currentcolor"/><path d="M360 128v32" fill="none" stroke="currentcolor"/><path d="M360 160v32" fill="none" stroke="currentcolor"/><path d="M360 192v32" fill="none" stroke="currentcolor"/><path d="M440 0V32" fill="none" stroke="currentcolor"/><path d="M440 32V64" fill="none" stroke="currentcolor"/><path d="M440 64V96" fill="none" stroke="currentcolor"/><path d="M440 96v32" fill="none" stroke="currentcolor"/><path d="M440 128v32" fill="none" stroke="currentcolor"/><path d="M440 160v32" fill="none" stroke="currentcolor"/><path d="M440 192v32" fill="none" stroke="currentcolor"/><text text-anchor="middle" x="280" y="20" fill="currentcolor" style="font-size:1em">N</text><text text-anchor="middle" x="280" y="36" fill="currentcolor" style="font-size:1em">=</text><text text-anchor="middle" x="280" y="52" fill="currentcolor" style="font-size:1em">G</text><text text-anchor="middle" x="280" y="84" fill="currentcolor" style="font-size:1em">W</text><text text-anchor="middle" x="280" y="116" fill="currentcolor" style="font-size:1em">H</text><text text-anchor="middle" x="280" y="148" fill="currentcolor" style="font-size:1em">S</text><text text-anchor="middle" x="280" y="180" fill="currentcolor" style="font-size:1em">H</text><text text-anchor="middle" x="280" y="212" fill="currentcolor" style="font-size:1em">M</text><text text-anchor="middle" x="288" y="20" fill="currentcolor" style="font-size:1em">a</text><text text-anchor="middle" x="288" y="36" fill="currentcolor" style="font-size:1em">=</text><text text-anchor="middle" x="288" y="52" fill="currentcolor" style="font-size:1em">u</text><text text-anchor="middle" x="288" y="84" fill="currentcolor" style="font-size:1em">F</text><text text-anchor="middle" x="288" y="116" fill="currentcolor" style="font-size:1em">o</text><text text-anchor="middle" x="288" y="148" fill="currentcolor" style="font-size:1em">h</text><text text-anchor="middle" x="288" y="180" fill="currentcolor" style="font-size:1em">o</text><text text-anchor="middle" x="288" y="212" fill="currentcolor" style="font-size:1em">a</text><text text-anchor="middle" x="296" y="20" fill="currentcolor" style="font-size:1em">m</text><text text-anchor="middle" x="296" y="36" fill="currentcolor" style="font-size:1em">=</text><text text-anchor="middle" x="296" y="52" fill="currentcolor" style="font-size:1em">e</text><text text-anchor="middle" x="296" y="84" fill="currentcolor" style="font-size:1em">H</text><text text-anchor="middle" x="296" y="116" fill="currentcolor" style="font-size:1em">m</text><text text-anchor="middle" x="296" y="148" fill="currentcolor" style="font-size:1em">a</text><text text-anchor="middle" x="296" y="180" fill="currentcolor" style="font-size:1em">m</text><text text-anchor="middle" x="296" y="212" fill="currentcolor" style="font-size:1em">n</text><text text-anchor="middle" x="304" y="20" fill="currentcolor" style="font-size:1em">e</text><text text-anchor="middle" x="304" y="36" fill="currentcolor" style="font-size:1em">=</text><text text-anchor="middle" x="304" y="52" fill="currentcolor" style="font-size:1em">s</text><text text-anchor="middle" x="304" y="116" fill="currentcolor" style="font-size:1em">e</text><text text-anchor="middle" x="304" y="148" fill="currentcolor" style="font-size:1em">r</text><text text-anchor="middle" x="304" y="180" fill="currentcolor" style="font-size:1em">e</text><text text-anchor="middle" x="304" y="212" fill="currentcolor" style="font-size:1em">a</text><text text-anchor="middle" x="312" y="36" fill="currentcolor" style="font-size:1em">=</text><text text-anchor="middle" x="312" y="52" fill="currentcolor" style="font-size:1em">t</text><text text-anchor="middle" x="312" y="116" fill="currentcolor" style="font-size:1em">U</text><text text-anchor="middle" x="312" y="148" fill="currentcolor" style="font-size:1em">e</text><text text-anchor="middle" x="312" y="180" fill="currentcolor" style="font-size:1em">L</text><text text-anchor="middle" x="312" y="212" fill="currentcolor" style="font-size:1em">g</text><text text-anchor="middle" x="320" y="36" fill="currentcolor" style="font-size:1em">=</text><text text-anchor="middle" x="320" y="52" fill="currentcolor" style="font-size:1em">s</text><text text-anchor="middle" x="320" y="116" fill="currentcolor" style="font-size:1em">s</text><text text-anchor="middle" x="320" y="148" fill="currentcolor" style="font-size:1em">d</text><text text-anchor="middle" x="320" y="180" fill="currentcolor" style="font-size:1em">a</text><text text-anchor="middle" x="320" y="212" fill="currentcolor" style="font-size:1em">e</text><text text-anchor="middle" x="328" y="36" fill="currentcolor" style="font-size:1em">=</text><text text-anchor="middle" x="328" y="116" fill="currentcolor" style="font-size:1em">e</text><text text-anchor="middle" x="328" y="180" fill="currentcolor" style="font-size:1em">b</text><text text-anchor="middle" x="328" y="212" fill="currentcolor" style="font-size:1em">m</text><text text-anchor="middle" x="336" y="36" fill="currentcolor" style="font-size:1em">=</text><text text-anchor="middle" x="336" y="116" fill="currentcolor" style="font-size:1em">r</text><text text-anchor="middle" x="336" y="212" fill="currentcolor" style="font-size:1em">e</text><text text-anchor="middle" x="344" y="36" fill="currentcolor" style="font-size:1em">=</text><text text-anchor="middle" x="344" y="116" fill="currentcolor" style="font-size:1em">s</text><text text-anchor="middle" x="344" y="212" fill="currentcolor" style="font-size:1em">n</text><text text-anchor="middle" x="352" y="36" fill="currentcolor" style="font-size:1em">=</text><text text-anchor="middle" x="352" y="212" fill="currentcolor" style="font-size:1em">t</text><text text-anchor="middle" x="368" y="36" fill="currentcolor" style="font-size:1em">=</text><text text-anchor="middle" x="376" y="20" fill="currentcolor" style="font-size:1em">V</text><text text-anchor="middle" x="376" y="36" fill="currentcolor" style="font-size:1em">=</text><text text-anchor="middle" x="384" y="20" fill="currentcolor" style="font-size:1em">L</text><text text-anchor="middle" x="384" y="36" fill="currentcolor" style="font-size:1em">=</text><text text-anchor="middle" x="392" y="20" fill="currentcolor" style="font-size:1em">A</text><text text-anchor="middle" x="392" y="36" fill="currentcolor" style="font-size:1em">=</text><text text-anchor="middle" x="400" y="20" fill="currentcolor" style="font-size:1em">N</text><text text-anchor="middle" x="400" y="36" fill="currentcolor" style="font-size:1em">=</text><text text-anchor="middle" x="400" y="52" fill="currentcolor" style="font-size:1em">1</text><text text-anchor="middle" x="400" y="84" fill="currentcolor" style="font-size:1em">2</text><text text-anchor="middle" x="400" y="116" fill="currentcolor" style="font-size:1em">3</text><text text-anchor="middle" x="400" y="148" fill="currentcolor" style="font-size:1em">4</text><text text-anchor="middle" x="400" y="180" fill="currentcolor" style="font-size:1em">5</text><text text-anchor="middle" x="400" y="212" fill="currentcolor" style="font-size:1em">6</text><text text-anchor="middle" x="408" y="36" fill="currentcolor" style="font-size:1em">=</text><text text-anchor="middle" x="408" y="52" fill="currentcolor" style="font-size:1em">0</text><text text-anchor="middle" x="408" y="84" fill="currentcolor" style="font-size:1em">0</text><text text-anchor="middle" x="408" y="116" fill="currentcolor" style="font-size:1em">0</text><text text-anchor="middle" x="408" y="148" fill="currentcolor" style="font-size:1em">0</text><text text-anchor="middle" x="408" y="180" fill="currentcolor" style="font-size:1em">0</text><text text-anchor="middle" x="408" y="212" fill="currentcolor" style="font-size:1em">0</text><text text-anchor="middle" x="416" y="20" fill="currentcolor" style="font-size:1em">I</text><text text-anchor="middle" x="416" y="36" fill="currentcolor" style="font-size:1em">=</text><text text-anchor="middle" x="424" y="20" fill="currentcolor" style="font-size:1em">D</text><text text-anchor="middle" x="424" y="36" fill="currentcolor" style="font-size:1em">=</text><text text-anchor="middle" x="432" y="36" fill="currentcolor" style="font-size:1em">=</text></g></svg></div><p>Please note the addition of the <code>Management</code> VLAN that will be used to access
+the management interfaces of the switches.</p><p>In my case, the physical connections on the hEX S will look like this:</p><div class="goat svg-container"><svg xmlns="http://www.w3.org/2000/svg" font-family="Menlo,Lucida Console,monospace" viewBox="0 0 952 281"><g transform="translate(8,16)"><path d="M40 16H56" fill="none" stroke="currentcolor"/><path d="M120 16H320" fill="none" stroke="currentcolor"/><path d="M64 64H96" fill="none" stroke="currentcolor"/><path d="M128 64h32" fill="none" stroke="currentcolor"/><path d="M160 64h32" fill="none" stroke="currentcolor"/><path d="M192 64h32" fill="none" stroke="currentcolor"/><path d="M224 64h32" fill="none" stroke="currentcolor"/><path d="M256 64h32" fill="none" stroke="currentcolor"/><path d="M64 96H96" fill="none" stroke="currentcolor"/><path d="M128 96h16" fill="none" stroke="currentcolor"/><path d="M144 96h16" fill="none" stroke="currentcolor"/><path d="M160 96h16" fill="none" stroke="currentcolor"/><path d="M176 96h16" fill="none" stroke="currentcolor"/><path d="M192 96h16" fill="none" stroke="currentcolor"/><path d="M208 96h16" fill="none" stroke="currentcolor"/><path d="M224 96h16" fill="none" stroke="currentcolor"/><path d="M240 96h16" fill="none" stroke="currentcolor"/><path d="M256 96h16" fill="none" stroke="currentcolor"/><path d="M272 96h16" fill="none" stroke="currentcolor"/><path d="M40 128H320" fill="none" stroke="currentcolor"/><path d="M120 160h24" fill="none" stroke="currentcolor"/><path d="M272 160h16" fill="none" stroke="currentcolor"/><path d="M240 192h48" fill="none" stroke="currentcolor"/><path d="M208 224h80" fill="none" stroke="currentcolor"/><path d="M176 256H288" fill="none" stroke="currentcolor"/><path d="M40 16V128" fill="none" stroke="currentcolor"/><path d="M64 64V96" fill="none" stroke="currentcolor"/><path d="M96 64V96" fill="none" stroke="currentcolor"/><path d="M128 64V96" fill="none" stroke="currentcolor"/><path d="M144 80V96" fill="none" stroke="currentcolor"/><path d="M144 96v16" fill="none" stroke="currentcolor"/><path d="M144 144v16" fill="none" stroke="currentcolor"/><path d="M160 64V96" fill="none" stroke="currentcolor"/><path d="M176 80V96" fill="none" stroke="currentcolor"/><path d="M176 96v16" fill="none" stroke="currentcolor"/><path d="M176 144V256" fill="none" stroke="currentcolor"/><path d="M192 64V96" fill="none" stroke="currentcolor"/><path d="M208 80V96" fill="none" stroke="currentcolor"/><path d="M208 96v16" fill="none" stroke="currentcolor"/><path d="M208 144v80" fill="none" stroke="currentcolor"/><path d="M224 64V96" fill="none" stroke="currentcolor"/><path d="M240 80V96" fill="none" stroke="currentcolor"/><path d="M240 96v16" fill="none" stroke="currentcolor"/><path d="M240 144v48" fill="none" stroke="currentcolor"/><path d="M256 64V96" fill="none" stroke="currentcolor"/><path d="M272 80V96" fill="none" stroke="currentcolor"/><path d="M272 96v16" fill="none" stroke="currentcolor"/><path d="M272 144v16" fill="none" stroke="currentcolor"/><path d="M288 64V96" fill="none" stroke="currentcolor"/><path d="M320 16V128" fill="none" stroke="currentcolor"/><path d="M144 112v8" fill="none" stroke="currentcolor"/><path d="M144 136v8" fill="none" stroke="currentcolor"/><path d="M176 112v8" fill="none" stroke="currentcolor"/><path d="M176 136v8" fill="none" stroke="currentcolor"/><path d="M208 112v8" fill="none" stroke="currentcolor"/><path d="M208 136v8" fill="none" stroke="currentcolor"/><path d="M240 112v8" fill="none" stroke="currentcolor"/><path d="M240 136v8" fill="none" stroke="currentcolor"/><path d="M272 112v8" fill="none" stroke="currentcolor"/><path d="M272 136v8" fill="none" stroke="currentcolor"/><circle cx="144" cy="80" r="6" stroke="currentcolor" fill="#fff"/><circle cx="176" cy="80" r="6" stroke="currentcolor" fill="#fff"/><circle cx="208" cy="80" r="6" stroke="currentcolor" fill="#fff"/><circle cx="240" cy="80" r="6" stroke="currentcolor" fill="#fff"/><circle cx="272" cy="80" r="6" stroke="currentcolor" fill="#fff"/><text text-anchor="middle" x="72" y="20" fill="currentcolor" style="font-size:1em">h</text><text text-anchor="middle" x="72" y="52" fill="currentcolor" style="font-size:1em">S</text><text text-anchor="middle" x="80" y="20" fill="currentcolor" style="font-size:1em">E</text><text text-anchor="middle" x="80" y="52" fill="currentcolor" style="font-size:1em">F</text><text text-anchor="middle" x="80" y="84" fill="currentcolor" style="font-size:1em">x</text><text text-anchor="middle" x="80" y="164" fill="currentcolor" style="font-size:1em">W</text><text text-anchor="middle" x="88" y="20" fill="currentcolor" style="font-size:1em">X</text><text text-anchor="middle" x="88" y="52" fill="currentcolor" style="font-size:1em">P</text><text text-anchor="middle" x="88" y="164" fill="currentcolor" style="font-size:1em">A</text><text text-anchor="middle" x="96" y="164" fill="currentcolor" style="font-size:1em">N</text><text text-anchor="middle" x="104" y="20" fill="currentcolor" style="font-size:1em">S</text><text text-anchor="middle" x="144" y="52" fill="currentcolor" style="font-size:1em">1</text><text text-anchor="middle" x="176" y="52" fill="currentcolor" style="font-size:1em">2</text><text text-anchor="middle" x="208" y="52" fill="currentcolor" style="font-size:1em">3</text><text text-anchor="middle" x="240" y="52" fill="currentcolor" style="font-size:1em">4</text><text text-anchor="middle" x="272" y="52" fill="currentcolor" style="font-size:1em">5</text><text text-anchor="middle" x="304" y="164" fill="currentcolor" style="font-size:1em">A</text><text text-anchor="middle" x="304" y="196" fill="currentcolor" style="font-size:1em">'</text><text text-anchor="middle" x="304" y="228" fill="currentcolor" style="font-size:1em">H</text><text text-anchor="middle" x="304" y="260" fill="currentcolor" style="font-size:1em">M</text><text text-anchor="middle" x="312" y="164" fill="currentcolor" style="font-size:1em">c</text><text text-anchor="middle" x="312" y="196" fill="currentcolor" style="font-size:1em">M</text><text text-anchor="middle" x="312" y="228" fill="currentcolor" style="font-size:1em">o</text><text text-anchor="middle" x="312" y="260" fill="currentcolor" style="font-size:1em">a</text><text text-anchor="middle" x="320" y="164" fill="currentcolor" style="font-size:1em">c</text><text text-anchor="middle" x="320" y="196" fill="currentcolor" style="font-size:1em">a</text><text text-anchor="middle" x="320" y="228" fill="currentcolor" style="font-size:1em">m</text><text text-anchor="middle" x="320" y="260" fill="currentcolor" style="font-size:1em">n</text><text text-anchor="middle" x="328" y="164" fill="currentcolor" style="font-size:1em">e</text><text text-anchor="middle" x="328" y="196" fill="currentcolor" style="font-size:1em">i</text><text text-anchor="middle" x="328" y="228" fill="currentcolor" style="font-size:1em">e</text><text text-anchor="middle" x="328" y="260" fill="currentcolor" style="font-size:1em">a</text><text text-anchor="middle" x="336" y="164" fill="currentcolor" style="font-size:1em">s</text><text text-anchor="middle" x="336" y="196" fill="currentcolor" style="font-size:1em">n</text><text text-anchor="middle" x="336" y="228" fill="currentcolor" style="font-size:1em">L</text><text text-anchor="middle" x="336" y="260" fill="currentcolor" style="font-size:1em">g</text><text text-anchor="middle" x="344" y="164" fill="currentcolor" style="font-size:1em">s</text><text text-anchor="middle" x="344" y="196" fill="currentcolor" style="font-size:1em">'</text><text text-anchor="middle" x="344" y="228" fill="currentcolor" style="font-size:1em">a</text><text text-anchor="middle" x="344" y="260" fill="currentcolor" style="font-size:1em">e</text><text text-anchor="middle" x="352" y="228" fill="currentcolor" style="font-size:1em">b</text><text text-anchor="middle" x="352" y="260" fill="currentcolor" style="font-size:1em">m</text><text text-anchor="middle" x="360" y="164" fill="currentcolor" style="font-size:1em">P</text><text text-anchor="middle" x="360" y="196" fill="currentcolor" style="font-size:1em">S</text><text text-anchor="middle" x="360" y="260" fill="currentcolor" style="font-size:1em">e</text><text text-anchor="middle" x="368" y="164" fill="currentcolor" style="font-size:1em">o</text><text text-anchor="middle" x="368" y="196" fill="currentcolor" style="font-size:1em">w</text><text text-anchor="middle" x="368" y="228" fill="currentcolor" style="font-size:1em">S</text><text text-anchor="middle" x="368" y="260" fill="currentcolor" style="font-size:1em">n</text><text text-anchor="middle" x="376" y="164" fill="currentcolor" style="font-size:1em">i</text><text text-anchor="middle" x="376" y="196" fill="currentcolor" style="font-size:1em">i</text><text text-anchor="middle" x="376" y="228" fill="currentcolor" style="font-size:1em">w</text><text text-anchor="middle" x="376" y="260" fill="currentcolor" style="font-size:1em">t</text><text text-anchor="middle" x="384" y="164" fill="currentcolor" style="font-size:1em">n</text><text text-anchor="middle" x="384" y="196" fill="currentcolor" style="font-size:1em">t</text><text text-anchor="middle" x="384" y="228" fill="currentcolor" style="font-size:1em">i</text><text text-anchor="middle" x="392" y="164" fill="currentcolor" style="font-size:1em">t</text><text text-anchor="middle" x="392" y="196" fill="currentcolor" style="font-size:1em">c</text><text text-anchor="middle" x="392" y="228" fill="currentcolor" style="font-size:1em">t</text><text text-anchor="middle" x="392" y="260" fill="currentcolor" style="font-size:1em">P</text><text text-anchor="middle" x="400" y="196" fill="currentcolor" style="font-size:1em">h</text><text text-anchor="middle" x="400" y="228" fill="currentcolor" style="font-size:1em">c</text><text text-anchor="middle" x="400" y="260" fill="currentcolor" style="font-size:1em">o</text><text text-anchor="middle" x="408" y="228" fill="currentcolor" style="font-size:1em">h</text><text text-anchor="middle" x="408" y="260" fill="currentcolor" style="font-size:1em">r</text><text text-anchor="middle" x="416" y="260" fill="currentcolor" style="font-size:1em">t</text><text text-anchor="middle" x="440" y="164" fill="currentcolor" style="font-size:1em">(</text><text text-anchor="middle" x="440" y="196" fill="currentcolor" style="font-size:1em">(</text><text text-anchor="middle" x="440" y="228" fill="currentcolor" style="font-size:1em">(</text><text text-anchor="middle" x="448" y="164" fill="currentcolor" style="font-size:1em">T</text><text text-anchor="middle" x="448" y="196" fill="currentcolor" style="font-size:1em">T</text><text text-anchor="middle" x="448" y="228" fill="currentcolor" style="font-size:1em">U</text><text text-anchor="middle" x="456" y="164" fill="currentcolor" style="font-size:1em">a</text><text text-anchor="middle" x="456" y="196" fill="currentcolor" style="font-size:1em">a</text><text text-anchor="middle" x="456" y="228" fill="currentcolor" style="font-size:1em">n</text><text text-anchor="middle" x="464" y="164" fill="currentcolor" style="font-size:1em">g</text><text text-anchor="middle" x="464" y="196" fill="currentcolor" style="font-size:1em">g</text><text text-anchor="middle" x="464" y="228" fill="currentcolor" style="font-size:1em">t</text><text text-anchor="middle" x="472" y="164" fill="currentcolor" style="font-size:1em">g</text><text text-anchor="middle" x="472" y="196" fill="currentcolor" style="font-size:1em">g</text><text text-anchor="middle" x="472" y="228" fill="currentcolor" style="font-size:1em">a</text><text text-anchor="middle" x="480" y="164" fill="currentcolor" style="font-size:1em">e</text><text text-anchor="middle" x="480" y="196" fill="currentcolor" style="font-size:1em">e</text><text text-anchor="middle" x="480" y="228" fill="currentcolor" style="font-size:1em">g</text><text text-anchor="middle" x="488" y="164" fill="currentcolor" style="font-size:1em">d</text><text text-anchor="middle" x="488" y="196" fill="currentcolor" style="font-size:1em">d</text><text text-anchor="middle" x="488" y="228" fill="currentcolor" style="font-size:1em">g</text><text text-anchor="middle" x="496" y="228" fill="currentcolor" style="font-size:1em">e</text><text text-anchor="middle" x="504" y="164" fill="currentcolor" style="font-size:1em">V</text><text text-anchor="middle" x="504" y="196" fill="currentcolor" style="font-size:1em">V</text><text text-anchor="middle" x="504" y="228" fill="currentcolor" style="font-size:1em">d</text><text text-anchor="middle" x="512" y="164" fill="currentcolor" style="font-size:1em">L</text><text text-anchor="middle" x="512" y="196" fill="currentcolor" style="font-size:1em">L</text><text text-anchor="middle" x="520" y="164" fill="currentcolor" style="font-size:1em">A</text><text text-anchor="middle" x="520" y="196" fill="currentcolor" style="font-size:1em">A</text><text text-anchor="middle" x="520" y="228" fill="currentcolor" style="font-size:1em">V</text><text text-anchor="middle" x="528" y="164" fill="currentcolor" style="font-size:1em">N</text><text text-anchor="middle" x="528" y="196" fill="currentcolor" style="font-size:1em">N</text><text text-anchor="middle" x="528" y="228" fill="currentcolor" style="font-size:1em">L</text><text text-anchor="middle" x="536" y="164" fill="currentcolor" style="font-size:1em">s</text><text text-anchor="middle" x="536" y="196" fill="currentcolor" style="font-size:1em">s</text><text text-anchor="middle" x="536" y="228" fill="currentcolor" style="font-size:1em">A</text><text text-anchor="middle" x="544" y="164" fill="currentcolor" style="font-size:1em">:</text><text text-anchor="middle" x="544" y="196" fill="currentcolor" style="font-size:1em">:</text><text text-anchor="middle" x="544" y="228" fill="currentcolor" style="font-size:1em">N</text><text text-anchor="middle" x="552" y="228" fill="currentcolor" style="font-size:1em">s</text><text text-anchor="middle" x="560" y="164" fill="currentcolor" style="font-size:1em">1</text><text text-anchor="middle" x="560" y="196" fill="currentcolor" style="font-size:1em">1</text><text text-anchor="middle" x="560" y="228" fill="currentcolor" style="font-size:1em">:</text><text text-anchor="middle" x="568" y="164" fill="currentcolor" style="font-size:1em">0</text><text text-anchor="middle" x="568" y="196" fill="currentcolor" style="font-size:1em">0</text><text text-anchor="middle" x="576" y="164" fill="currentcolor" style="font-size:1em">,</text><text text-anchor="middle" x="576" y="196" fill="currentcolor" style="font-size:1em">,</text><text text-anchor="middle" x="576" y="228" fill="currentcolor" style="font-size:1em">5</text><text text-anchor="middle" x="584" y="228" fill="currentcolor" style="font-size:1em">0</text><text text-anchor="middle" x="592" y="164" fill="currentcolor" style="font-size:1em">2</text><text text-anchor="middle" x="592" y="196" fill="currentcolor" style="font-size:1em">2</text><text text-anchor="middle" x="592" y="228" fill="currentcolor" style="font-size:1em">)</text><text text-anchor="middle" x="600" y="164" fill="currentcolor" style="font-size:1em">0</text><text text-anchor="middle" x="600" y="196" fill="currentcolor" style="font-size:1em">0</text><text text-anchor="middle" x="608" y="164" fill="currentcolor" style="font-size:1em">,</text><text text-anchor="middle" x="608" y="196" fill="currentcolor" style="font-size:1em">,</text><text text-anchor="middle" x="624" y="164" fill="currentcolor" style="font-size:1em">3</text><text text-anchor="middle" x="624" y="196" fill="currentcolor" style="font-size:1em">3</text><text text-anchor="middle" x="632" y="164" fill="currentcolor" style="font-size:1em">0</text><text text-anchor="middle" x="632" y="196" fill="currentcolor" style="font-size:1em">0</text><text text-anchor="middle" x="640" y="164" fill="currentcolor" style="font-size:1em">)</text><text text-anchor="middle" x="640" y="196" fill="currentcolor" style="font-size:1em">,</text><text text-anchor="middle" x="656" y="196" fill="currentcolor" style="font-size:1em">4</text><text text-anchor="middle" x="664" y="196" fill="currentcolor" style="font-size:1em">0</text><text text-anchor="middle" x="672" y="196" fill="currentcolor" style="font-size:1em">,</text><text text-anchor="middle" x="688" y="196" fill="currentcolor" style="font-size:1em">5</text><text text-anchor="middle" x="696" y="196" fill="currentcolor" style="font-size:1em">0</text><text text-anchor="middle" x="704" y="196" fill="currentcolor" style="font-size:1em">,</text><text text-anchor="middle" x="720" y="196" fill="currentcolor" style="font-size:1em">6</text><text text-anchor="middle" x="728" y="196" fill="currentcolor" style="font-size:1em">0</text><text text-anchor="middle" x="736" y="196" fill="currentcolor" style="font-size:1em">)</text></g></svg></div><p>After configuring the <code>ether2</code> as the management port, the <code>bridge</code> spans ports <code>ether3</code> to <code>ether5</code>.</p><p>By default the <code>vlan-filtering</code> on the <code>bridge</code> interface is off, switch it on:</p><pre tabindex=0><code>/interface/bridge/set bridge vlan-filtering=yes
+</code></pre><p>I&rsquo;d like to have a DHCP server running for all the VLANs, so I&rsquo;ll create an
+interface for each:</p><pre tabindex=0><code>/interface/vlan/add interface=bridge name=vlan10 vlan-id=10
+/interface/vlan/add interface=bridge name=vlan20 vlan-id=20
+/interface/vlan/add interface=bridge name=vlan30 vlan-id=30
+/interface/vlan/add interface=bridge name=vlan40 vlan-id=40
+/interface/vlan/add interface=bridge name=vlan50 vlan-id=50
+/interface/vlan/add interface=bridge name=vlan60 vlan-id=60
+</code></pre><p>and assign IP addresses (I&rsquo;d like to have a gateway in each VLAN):</p><pre tabindex=0><code>/ip/address/add address=192.168.10.1/24 interface=vlan10
+/ip/address/add address=192.168.20.1/24 interface=vlan20
+/ip/address/add address=192.168.30.1/24 interface=vlan30
+/ip/address/add address=192.168.40.1/24 interface=vlan40
+/ip/address/add address=192.168.50.1/24 interface=vlan50
+/ip/address/add address=192.168.60.1/24 interface=vlan60
+</code></pre><p>Let&rsquo;s focus on the <code>HomeLab</code> network for a moment. It will be accessible
+without tagging on <code>ether3</code> and should be the easiest to test.</p><p>First, configure the <code>pvid</code> on the bridge port, to assign the (untagged)
+traffic from that port to the correct VLAN:</p><pre tabindex=0><code>/interface/bridge/port/set pvid=50 numbers=[find where interface=ether3]
+</code></pre><p>Now add the VLAN to the bridge. Please note, that I&rsquo;m adding the <code>bridge</code> as a
+tagged interface here. This is required to connect the DHCP server for that
+VLAN to the network:</p><pre tabindex=0><code>/interface/bridge/vlan/add bridge=bridge tagged=bridge untagged=ether3 vlan-ids=50
+</code></pre><p>Wait&mldr; Did I say a DHCP server?</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-shell data-lang=shell><span style=display:flex><span><span style=color:#75715e># it needs a pool of addresses to give to the clients:</span>
+</span></span><span style=display:flex><span>/ip/pool/add name<span style=color:#f92672>=</span>vlan50-dhcp ranges<span style=color:#f92672>=</span>192.168.50.2-192.168.50.254
+</span></span><span style=display:flex><span><span style=color:#75715e># it would be nice to setup the default gateway well:</span>
+</span></span><span style=display:flex><span>/ip/dhcp-server/network/add address<span style=color:#f92672>=</span>192.168.50.0/24 gateway<span style=color:#f92672>=</span>192.168.50.1
+</span></span><span style=display:flex><span><span style=color:#75715e># and the server itself:</span>
+</span></span><span style=display:flex><span>/ip/dhcp-server/add address-pool<span style=color:#f92672>=</span>vlan50-dhcp interface<span style=color:#f92672>=</span>vlan50 name<span style=color:#f92672>=</span>dhcp-vlan50
+</span></span></code></pre></div><p>The VLAN 50 should be functional now, with DHCP handing out addresses to the
+clients and being able to access the internet through the gateway.</p><p>Give it a try, there is no point in going any further if that doesn&rsquo;t work.</p><p>&mldr;</p><p>Ok, if that is working as intended, let&rsquo;s jump to the tagged VLANs setup.</p><p>As before, add the VLANs to the bridge:</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-csh data-lang=csh><span style=display:flex><span><span style=color:#75715e># I&#39;ll have wired and wireless users:</span>
+</span></span><span style=display:flex><span>/interface/bridge/vlan/add bridge<span style=color:#f92672>=</span>bridge vlan-ids<span style=color:#f92672>=</span>10 tagged<span style=color:#f92672>=</span>ether4,ether5,bridge
+</span></span><span style=display:flex><span>/interface/bridge/vlan/add bridge<span style=color:#f92672>=</span>bridge vlan-ids<span style=color:#f92672>=</span>20 tagged<span style=color:#f92672>=</span>ether4,ether5,bridge
+</span></span><span style=display:flex><span>/interface/bridge/vlan/add bridge<span style=color:#f92672>=</span>bridge vlan-ids<span style=color:#f92672>=</span>30 tagged<span style=color:#f92672>=</span>ether4,ether5,bridge
+</span></span><span style=display:flex><span><span style=color:#75715e># but only wired &#39;services&#39;:</span>
+</span></span><span style=display:flex><span>/interface/bridge/vlan/add bridge<span style=color:#f92672>=</span>bridge vlan-ids<span style=color:#f92672>=</span>40 tagged<span style=color:#f92672>=</span>ether4,bridge
+</span></span><span style=display:flex><span>/interface/bridge/vlan/add bridge<span style=color:#f92672>=</span>bridge vlan-ids<span style=color:#f92672>=</span>60 tagged<span style=color:#f92672>=</span>ether4,bridge
+</span></span></code></pre></div><p>and configure the DHCP:</p><pre tabindex=0><code>/ip/pool/add name=vlan10-dhcp ranges=192.168.10.2-192.168.10.254
+/ip/pool/add name=vlan20-dhcp ranges=192.168.20.2-192.168.20.254
+/ip/pool/add name=vlan30-dhcp ranges=192.168.30.2-192.168.30.254
+/ip/pool/add name=vlan40-dhcp ranges=192.168.40.2-192.168.40.254
+/ip/pool/add name=vlan60-dhcp ranges=192.168.60.2-192.168.60.254
+
+/ip/dhcp-server/network/add address=192.168.10.0/24 gateway=192.168.10.1 dns-server=192.168.10.1
+/ip/dhcp-server/network/add address=192.168.20.0/24 gateway=192.168.20.1 dns-server=192.168.20.1
+/ip/dhcp-server/network/add address=192.168.30.0/24 gateway=192.168.30.1 dns-server=192.168.30.1
+/ip/dhcp-server/network/add address=192.168.40.0/24 gateway=192.168.40.1 dns-server=192.168.40.1
+/ip/dhcp-server/network/add address=192.168.60.0/24 gateway=192.168.60.1 dns-server=192.168.60.1
+
+/ip/dhcp-server/add address-pool=vlan10-dhcp interface=vlan10 name=dhcp-vlan10
+/ip/dhcp-server/add address-pool=vlan20-dhcp interface=vlan20 name=dhcp-vlan20
+/ip/dhcp-server/add address-pool=vlan30-dhcp interface=vlan30 name=dhcp-vlan30
+/ip/dhcp-server/add address-pool=vlan40-dhcp interface=vlan40 name=dhcp-vlan40
+/ip/dhcp-server/add address-pool=vlan60-dhcp interface=vlan60 name=dhcp-vlan60
+</code></pre><p>Now, let&rsquo;s make sure that only the traffic we expect is coming from the ports:</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-shell data-lang=shell><span style=display:flex><span><span style=color:#75715e># untagged home lab:</span>
+</span></span><span style=display:flex><span>/interface/bridge/port/set <span style=color:#f92672>[</span>find where interface<span style=color:#f92672>=</span>ether3<span style=color:#f92672>]</span> ingress-filtering<span style=color:#f92672>=</span>yes <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span><span style=color:#ae81ff></span>  frame-types<span style=color:#f92672>=</span>admit-only-untagged-and-priority-tagged
+</span></span><span style=display:flex><span><span style=color:#75715e># tagged switch and ap:</span>
+</span></span><span style=display:flex><span>/interface/bridge/port/set <span style=color:#f92672>[</span>find where interface<span style=color:#f92672>=</span>ether4<span style=color:#f92672>]</span> ingress-filtering<span style=color:#f92672>=</span>yes <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span><span style=color:#ae81ff></span>  frame-types<span style=color:#f92672>=</span>admit-only-vlan-tagged
+</span></span><span style=display:flex><span>/interface/bridge/port/set <span style=color:#f92672>[</span>find where interface<span style=color:#f92672>=</span>ether5<span style=color:#f92672>]</span> ingress-filtering<span style=color:#f92672>=</span>yes <span style=color:#ae81ff>\
+</span></span></span><span style=display:flex><span><span style=color:#ae81ff></span>  frame-types<span style=color:#f92672>=</span>admit-only-vlan-tagged
+</span></span></code></pre></div><p>The
+<a href=https://help.mikrotik.com/docs/display/ROS/Bridge+VLAN+Table target=_blank rel="noopener noreffer">documentation</a>
+says it&rsquo;s a good idea to allow only tagged traffic to the bridge interface, so
+let&rsquo;s do that:</p><pre tabindex=0><code>/interface/bridge/set bridge frame-types=admit-only-vlan-tagged ingress-filtering=yes
+</code></pre><p>I don&rsquo;t think it&rsquo;s strictly necessary in this setup though. The <code>bridge</code>
+doesn&rsquo;t have an IP assigned and the router is connected to the other networks
+anyway, but I&rsquo;m adding the filter anyway in case I miss something obvious.</p><p>The VLANs are connected to the router, they should be able to reach the
+internet&mldr; Are we done? Not yet! I wanted to isolate the hosts connected to
+the VLANs, but at this point they are able to talk to each other through the
+router. Why?</p><h2 id=filtering-the-traffic>Filtering the traffic</h2><p>There are no firewall rules that would restrict the traffic flowing through the
+router between the VLANs. That has to be fixed.</p><p>First, let&rsquo;s remove the IPv6 from the scope. I don&rsquo;t need it for now:</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-shell data-lang=shell><span style=display:flex><span><span style=color:#75715e># remove all ipv6 firewall rules</span>
+</span></span><span style=display:flex><span>/ipv6/firewall/filter/remove <span style=color:#f92672>[</span>find<span style=color:#f92672>]</span>
+</span></span><span style=display:flex><span><span style=color:#75715e># drop all traffic:</span>
+</span></span><span style=display:flex><span>/ipv6/firewall/filter/add chain<span style=color:#f92672>=</span>forward action<span style=color:#f92672>=</span>drop
+</span></span><span style=display:flex><span>/ipv6/firewall/filter/add chain<span style=color:#f92672>=</span>input action<span style=color:#f92672>=</span>drop
+</span></span></code></pre></div><p>Done. Problem solved.</p><p>Now, how does the default firewall for IPv4 look like?</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-shell data-lang=shell><span style=display:flex><span><span style=color:#f92672>[</span>admin@MikroTik<span style=color:#f92672>]</span> /ip/pool&gt; /ip/firewall/filter/print chain<span style=color:#f92672>=</span>forward
+</span></span><span style=display:flex><span>Flags: X - disabled, I - invalid; D - dynamic 
+</span></span><span style=display:flex><span> <span style=color:#ae81ff>0</span>  D ;;; special dummy rule to show fasttrack counters
+</span></span><span style=display:flex><span>      chain<span style=color:#f92672>=</span>forward action<span style=color:#f92672>=</span>passthrough 
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span> <span style=color:#ae81ff>1</span>    ;;; defconf: accept in ipsec policy
+</span></span><span style=display:flex><span>      chain<span style=color:#f92672>=</span>forward action<span style=color:#f92672>=</span>accept ipsec-policy<span style=color:#f92672>=</span>in,ipsec 
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span> <span style=color:#ae81ff>2</span>    ;;; defconf: accept out ipsec policy
+</span></span><span style=display:flex><span>      chain<span style=color:#f92672>=</span>forward action<span style=color:#f92672>=</span>accept ipsec-policy<span style=color:#f92672>=</span>out,ipsec 
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span> <span style=color:#ae81ff>3</span>    ;;; defconf: fasttrack
+</span></span><span style=display:flex><span>      chain<span style=color:#f92672>=</span>forward action<span style=color:#f92672>=</span>fasttrack-connection hw-offload<span style=color:#f92672>=</span>yes connection-state<span style=color:#f92672>=</span>established,related 
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span> <span style=color:#ae81ff>4</span>    ;;; defconf: accept established,related, untracked
+</span></span><span style=display:flex><span>      chain<span style=color:#f92672>=</span>forward action<span style=color:#f92672>=</span>accept connection-state<span style=color:#f92672>=</span>established,related,untracked 
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span> <span style=color:#ae81ff>5</span>    ;;; defconf: drop invalid
+</span></span><span style=display:flex><span>      chain<span style=color:#f92672>=</span>forward action<span style=color:#f92672>=</span>drop connection-state<span style=color:#f92672>=</span>invalid 
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span> <span style=color:#ae81ff>6</span>    ;;; defconf: drop all from WAN not DSTNATed
+</span></span><span style=display:flex><span>      chain<span style=color:#f92672>=</span>forward action<span style=color:#f92672>=</span>drop connection-state<span style=color:#f92672>=</span>new connection-nat-state<span style=color:#f92672>=</span>!dstnat in-interface-list<span style=color:#f92672>=</span>WAN 
+</span></span></code></pre></div><p>Let&rsquo;s add a drop catch-all rule at the end:</p><pre tabindex=0><code>/ip/firewall/filter/add chain=forward action=drop comment=catchall
+</code></pre><p>I assume there is no internet access from the VLANs now. Grant it with:</p><pre tabindex=0><code>/ip/firewall/filter/add chain=forward action=accept connection-state=new out-interface-list=WAN in-interface-list=!WAN place-before=[find comment=catchall]
+</code></pre><p>Now allow the connections between VLANs, as shown in the diagram at the beginning of this post:</p><pre tabindex=0><code>/ip/firewall/filter/add chain=forward action=accept connection-state=new out-interface=vlan40 in-interface=vlan20 place-before=[find comment=catchall]
+/ip/firewall/filter/add chain=forward action=accept connection-state=new out-interface=vlan40 in-interface=vlan30 place-before=[find comment=catchall]
+/ip/firewall/filter/add chain=forward action=accept connection-state=new out-interface=vlan50 in-interface=vlan30 place-before=[find comment=catchall]
+</code></pre><p>I&rsquo;m fine with home users being able to access the management VLAN as well:</p><pre tabindex=0><code>/ip/firewall/filter/add chain=forward action=accept connection-state=new out-interface=vlan60 in-interface=vlan30 place-before=[find comment=catchall]
+</code></pre><h2 id=dns-haiku>DNS Haiku</h2><p>There is still something missing here&mldr;</p><blockquote><p>It&rsquo;s not DNS</p><p>There&rsquo;s no way it&rsquo;s DNS</p><p>It was DNS</p><p><a href=https://www.cyberciti.biz/humour/a-haiku-about-dns/ target=_blank rel="noopener noreffer"><em>source</em></a></p></blockquote><p>The DNS server is enabled by default, but after reconfiguring the bridge, the input firewall rules need some adjustments. Let&rsquo;s take a look:</p><pre tabindex=0><code> 4    ;;; defconf: drop all not coming from LAN
+      chain=input action=drop in-interface-list=!LAN 
+</code></pre><p>The <code>LAN</code> interface list contains the bridge interface, but it would make more
+sense to have the VLAN interfaces there. Do I need all of the traffic though?
+DNS should be enough for now. Instead of creating single rule for each VLAN, I&rsquo;ll create an interface list:</p><pre tabindex=0><code>/interface/list/add name=all-internal-vlans
+/interface/list/member/add list=all-internal-vlans interface=vlan10
+/interface/list/member/add list=all-internal-vlans interface=vlan20
+/interface/list/member/add list=all-internal-vlans interface=vlan30
+/interface/list/member/add list=all-internal-vlans interface=vlan40
+/interface/list/member/add list=all-internal-vlans interface=vlan50
+/interface/list/member/add list=all-internal-vlans interface=vlan60
+</code></pre><p>and then add the firewall rule:</p><pre tabindex=0><code>/ip/firewall/filter/add chain=input action=accept dst-port=53 protocol=udp in-interface-list=all-internal-vlans place-before=[find comment=catchall]
+</code></pre><p>I&rsquo;ll finish by removing the default rule mentioned above:</p><pre tabindex=0><code>/ip/firewall/filter/remove [find comment=&#34;defconf: drop all not coming from LAN&#34;]
+</code></pre><p>and replacing it with a drop all rule:</p><pre tabindex=0><code>/ip/firewall/filter add chain=input action=drop
+</code></pre><h2 id=summary>Summary</h2><details><summary>Click here to see the resulting config</summary><pre tabindex=0><code># aug/16/2022 13:37:11 by RouterOS 7.4.1
+# software id = BLFX-WCHT
+#
+# model = RB760iGS
+# serial number = XXXXXXXXXXXX
+/interface bridge
+add admin-mac=xx:xx:xx:xx:xx:xx auto-mac=no comment=defconf frame-types=admit-only-vlan-tagged name=bridge vlan-filtering=yes
+/interface vlan
+add interface=bridge name=vlan10 vlan-id=10
+add interface=bridge name=vlan20 vlan-id=20
+add interface=bridge name=vlan30 vlan-id=30
+add interface=bridge name=vlan40 vlan-id=40
+add interface=bridge name=vlan50 vlan-id=50
+add interface=bridge name=vlan60 vlan-id=60
+/interface list
+add comment=defconf name=WAN
+add comment=defconf name=LAN
+add name=all-internal-vlans
+/interface wireless security-profiles
+set [ find default=yes ] supplicant-identity=MikroTik
+/ip hotspot profile
+set [ find default=yes ] html-directory=hotspot
+/ip pool
+add name=mgmt-dhcp ranges=192.168.0.2-192.168.0.254
+add name=vlan50-dhcp ranges=192.168.50.2-192.168.50.254
+add name=vlan10-dhcp ranges=192.168.10.2-192.168.10.254
+add name=vlan20-dhcp ranges=192.168.20.2-192.168.20.254
+add name=vlan30-dhcp ranges=192.168.30.2-192.168.30.254
+add name=vlan40-dhcp ranges=192.168.40.2-192.168.40.254
+add name=vlan60-dhcp ranges=192.168.60.2-192.168.60.254
+/ip dhcp-server
+add address-pool=mgmt-dhcp interface=ether2 name=mgmt-dhcp
+add address-pool=vlan50-dhcp interface=vlan50 name=dhcp-vlan50
+add address-pool=vlan10-dhcp interface=vlan10 name=dhcp-vlan10
+add address-pool=vlan20-dhcp interface=vlan20 name=dhcp-vlan20
+add address-pool=vlan30-dhcp interface=vlan30 name=dhcp-vlan30
+add address-pool=vlan40-dhcp interface=vlan40 name=dhcp-vlan40
+add address-pool=vlan60-dhcp interface=vlan60 name=dhcp-vlan60
+/port
+set 0 name=serial0
+/interface bridge port
+add bridge=bridge comment=defconf frame-types=admit-only-untagged-and-priority-tagged interface=ether3 pvid=50
+add bridge=bridge comment=defconf frame-types=admit-only-vlan-tagged interface=ether4
+add bridge=bridge comment=defconf frame-types=admit-only-vlan-tagged interface=ether5
+add bridge=bridge comment=defconf interface=sfp1
+/ip neighbor discovery-settings
+set discover-interface-list=LAN
+/interface bridge vlan
+add bridge=bridge tagged=bridge untagged=ether3 vlan-ids=50
+add bridge=bridge tagged=ether4,ether5,bridge vlan-ids=10
+add bridge=bridge tagged=ether4,ether5,bridge vlan-ids=20
+add bridge=bridge tagged=ether4,ether5,bridge vlan-ids=30
+add bridge=bridge tagged=ether4,bridge vlan-ids=40
+add bridge=bridge tagged=ether4,bridge vlan-ids=60
+/interface list member
+add comment=defconf interface=bridge list=LAN
+add comment=defconf interface=ether1 list=WAN
+add interface=vlan10 list=all-internal-vlans
+add interface=vlan20 list=all-internal-vlans
+add interface=vlan30 list=all-internal-vlans
+add interface=vlan40 list=all-internal-vlans
+add interface=vlan50 list=all-internal-vlans
+add interface=vlan60 list=all-internal-vlans
+/ip address
+add address=192.168.0.1/24 interface=ether2 network=192.168.0.0
+add address=192.168.10.1/24 interface=vlan10 network=192.168.10.0
+add address=192.168.20.1/24 interface=vlan20 network=192.168.20.0
+add address=192.168.30.1/24 interface=vlan30 network=192.168.30.0
+add address=192.168.40.1/24 interface=vlan40 network=192.168.40.0
+add address=192.168.50.1/24 interface=vlan50 network=192.168.50.0
+add address=192.168.60.1/24 interface=vlan60 network=192.168.60.0
+/ip dhcp-client
+add comment=defconf interface=ether1
+/ip dhcp-server network
+add address=192.168.0.0/24 comment=mgmt
+add address=192.168.10.0/24 dns-server=192.168.10.1 gateway=192.168.10.1
+add address=192.168.20.0/24 dns-server=192.168.20.1 gateway=192.168.20.1
+add address=192.168.30.0/24 dns-server=192.168.30.1 gateway=192.168.30.1
+add address=192.168.40.0/24 dns-server=192.168.40.1 gateway=192.168.40.1
+add address=192.168.50.0/24 gateway=192.168.50.1
+add address=192.168.60.0/24 dns-server=192.168.60.1 gateway=192.168.60.1
+/ip dns
+set allow-remote-requests=yes
+/ip firewall filter
+add action=accept chain=input comment=&#34;defconf: accept established,related,untracked&#34; connection-state=established,related,untracked
+add action=drop chain=input comment=&#34;defconf: drop invalid&#34; connection-state=invalid
+add action=accept chain=input comment=&#34;defconf: accept ICMP&#34; protocol=icmp
+add action=accept chain=input in-interface=ether2
+add action=accept chain=input comment=&#34;defconf: accept to local loopback (for CAPsMAN)&#34; dst-address=127.0.0.1
+add action=accept chain=forward comment=&#34;defconf: accept in ipsec policy&#34; ipsec-policy=in,ipsec
+add action=accept chain=forward comment=&#34;defconf: accept out ipsec policy&#34; ipsec-policy=out,ipsec
+add action=fasttrack-connection chain=forward comment=&#34;defconf: fasttrack&#34; connection-state=established,related hw-offload=yes
+add action=accept chain=forward comment=&#34;defconf: accept established,related, untracked&#34; connection-state=established,related,untracked
+add action=drop chain=forward comment=&#34;defconf: drop invalid&#34; connection-state=invalid
+add action=drop chain=forward comment=&#34;defconf: drop all from WAN not DSTNATed&#34; connection-nat-state=!dstnat connection-state=new in-interface-list=WAN
+add action=accept chain=forward connection-state=new in-interface-list=!WAN out-interface-list=WAN
+add action=accept chain=forward connection-state=new in-interface=vlan20 out-interface=vlan40
+add action=accept chain=forward connection-state=new in-interface=vlan30 out-interface=vlan40
+add action=accept chain=forward connection-state=new in-interface=vlan30 out-interface=vlan50
+add action=accept chain=forward connection-state=new in-interface=vlan30 out-interface=vlan60
+add action=accept chain=input dst-port=53 in-interface-list=all-internal-vlans protocol=udp
+add action=drop chain=forward comment=catchall
+add action=drop chain=input
+/ip firewall nat
+add action=masquerade chain=srcnat comment=&#34;defconf: masquerade&#34; ipsec-policy=out,none out-interface-list=WAN
+/ipv6 firewall address-list
+add address=::/128 comment=&#34;defconf: unspecified address&#34; list=bad_ipv6
+add address=::1/128 comment=&#34;defconf: lo&#34; list=bad_ipv6
+add address=fec0::/10 comment=&#34;defconf: site-local&#34; list=bad_ipv6
+add address=::ffff:0.0.0.0/96 comment=&#34;defconf: ipv4-mapped&#34; list=bad_ipv6
+add address=::/96 comment=&#34;defconf: ipv4 compat&#34; list=bad_ipv6
+add address=100::/64 comment=&#34;defconf: discard only &#34; list=bad_ipv6
+add address=2001:db8::/32 comment=&#34;defconf: documentation&#34; list=bad_ipv6
+add address=2001:10::/28 comment=&#34;defconf: ORCHID&#34; list=bad_ipv6
+add address=3ffe::/16 comment=&#34;defconf: 6bone&#34; list=bad_ipv6
+/ipv6 firewall filter
+add action=drop chain=forward
+add action=drop chain=input
+/system clock
+set time-zone-name=Europe/Warsaw
+/system routerboard settings
+set silent-boot=yes
+/tool mac-server
+set allowed-interface-list=LAN
+/tool mac-server mac-winbox
+set allowed-interface-list=LAN
+</code></pre></details><p>That&rsquo;s it!</p><p>The end result works as intended and I&rsquo;m pleased with the outcome. It&rsquo;s a good
+cornerstone for my homelab.</p><p>This relatively simple task allowed me to get familiar with the MikroTik CLI.
+I really like the fact that I can go through the full config export and make
+sure that it doesn&rsquo;t contain any surprises.</p><p>Thank you for reading and have a great day!</p></div><div class=post-footer id=post-footer><div class=post-info><div class=post-info-line><div class=post-info-mod><span>Updated on 2022-08-13</span></div></div><div class=post-info-line><div class=post-info-md></div><div class=post-info-share><span><a href=javascript:void(0); title="Share on Twitter" data-sharer=twitter data-url=https://janrotter.github.io/posts/mikrotik/ data-title="My Basic MikroTik hEX S Setup" data-hashtags=mikrotik,homelab,vlans><i class="fab fa-twitter fa-fw" aria-hidden=true></i></a><a href=javascript:void(0); title="Share on Facebook" data-sharer=facebook data-url=https://janrotter.github.io/posts/mikrotik/ data-hashtag=mikrotik><i class="fab fa-facebook-square fa-fw" aria-hidden=true></i></a><a href=javascript:void(0); title="Share on Hacker News" data-sharer=hackernews data-url=https://janrotter.github.io/posts/mikrotik/ data-title="My Basic MikroTik hEX S Setup"><i class="fab fa-hacker-news fa-fw" aria-hidden=true></i></a></span></div></div></div><div class=post-info-more><section class=post-tags><i class="fas fa-tags fa-fw" aria-hidden=true></i>&nbsp;<a href=/tags/mikrotik/>mikrotik</a>,&nbsp;<a href=/tags/homelab/>homelab</a>,&nbsp;<a href=/tags/vlans/>vlans</a></section><section><span><a href=javascript:void(0); onclick=window.history.back()>Back</a></span>&nbsp;|&nbsp;<span><a href=/>Home</a></span></section></div><div class=post-nav><a href=/posts/cant_reach_docker_container/ class=next rel=next title="I can't reach a published container port from outside of the host!">I can't reach a published container port from outside of the host!<i class="fas fa-angle-right fa-fw" aria-hidden=true></i></a></div></div></article></div></main><footer class=footer><div class=footer-container><div class=footer-line>Powered by <a href=https://gohugo.io/ target=_blank rel="noopener noreffer" title="Hugo 0.101.0">Hugo</a> | Theme - <a href=https://github.com/dillonzq/LoveIt target=_blank rel="noopener noreffer" title="LoveIt 0.2.11"><i class="far fa-kiss-wink-heart fa-fw" aria-hidden=true></i> LoveIt</a></div><div class=footer-line itemscope itemtype=http://schema.org/CreativeWork><i class="far fa-copyright fa-fw" aria-hidden=true></i><span itemprop=copyrightYear>2022</span><span class=author itemprop=copyrightHolder>&nbsp;<a href=/ target=_blank>Jan Rotter</a></span></div></div></footer></div><div id=fixed-buttons><a href=# id=back-to-top class=fixed-button title="Back to Top"><i class="fas fa-arrow-up fa-fw" aria-hidden=true></i>
+</a><a href=# id=view-comments class=fixed-button title="View Comments"><i class="fas fa-comment fa-fw" aria-hidden=true></i></a></div><script type=text/javascript src=https://cdn.jsdelivr.net/npm/lazysizes@5.3.2/lazysizes.min.js></script><script type=text/javascript src=https://cdn.jsdelivr.net/npm/clipboard@2.0.11/dist/clipboard.min.js></script><script type=text/javascript src=https://cdn.jsdelivr.net/npm/sharer.js@0.5.1/sharer.min.js></script><script type=text/javascript>window.config={code:{copyTitle:"Copy to clipboard",maxShownLines:50},comment:{}}</script><script type=text/javascript src=/js/theme.min.js></script></body></html>

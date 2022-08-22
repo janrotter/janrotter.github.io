@@ -1,0 +1,278 @@
+<!doctype html><html lang=en-us><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><meta name=robots content="noodp"><title>I can't reach a published container port from outside of the host! - Jan Rotter Blog</title><meta name=Description content="This is my cool site"><meta property="og:title" content="I can't reach a published container port from outside of the host!"><meta property="og:description" content="After a seemingly fresh install of docker I couldn&rsquo;t access an exposed container port. This post documents the troubleshooting process and the culprit."><meta property="og:type" content="article"><meta property="og:url" content="https://janrotter.github.io/posts/cant_reach_docker_container/"><meta property="article:section" content="posts"><meta property="article:published_time" content="2022-09-06T22:34:32+02:00"><meta property="article:modified_time" content="2022-09-06T22:34:32+02:00"><meta property="og:site_name" content="My cool site"><meta name=twitter:card content="summary"><meta name=twitter:title content="I can't reach a published container port from outside of the host!"><meta name=twitter:description content="After a seemingly fresh install of docker I couldn&rsquo;t access an exposed container port. This post documents the troubleshooting process and the culprit."><meta name=application-name content="My cool site"><meta name=apple-mobile-web-app-title content="My cool site"><meta name=theme-color content="#ffffff"><meta name=msapplication-TileColor content="#da532c"><link rel="shortcut icon" type=image/x-icon href=/favicon.ico><link rel=icon type=image/png sizes=32x32 href=/favicon-32x32.png><link rel=icon type=image/png sizes=16x16 href=/favicon-16x16.png><link rel=apple-touch-icon sizes=180x180 href=/apple-touch-icon.png><link rel=mask-icon href=/safari-pinned-tab.svg color=#5bbad5><link rel=manifest href=/site.webmanifest><link rel=canonical href=https://janrotter.github.io/posts/cant_reach_docker_container/><link rel=prev href=https://janrotter.github.io/posts/mikrotik/><link rel=stylesheet href=/css/style.min.css><link rel=preload href=https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.1.1/css/all.min.css as=style onload='this.onload=null,this.rel="stylesheet"'><noscript><link rel=stylesheet href=https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.1.1/css/all.min.css></noscript><link rel=preload href=https://cdn.jsdelivr.net/npm/animate.css@4.1.1/animate.min.css as=style onload='this.onload=null,this.rel="stylesheet"'><noscript><link rel=stylesheet href=https://cdn.jsdelivr.net/npm/animate.css@4.1.1/animate.min.css></noscript><script type=application/ld+json>{"@context":"http://schema.org","@type":"BlogPosting","headline":"I can't reach a published container port from outside of the host!","inLanguage":"en-us","mainEntityOfPage":{"@type":"WebPage","@id":"https:\/\/janrotter.github.io\/posts\/cant_reach_docker_container\/"},"genre":"posts","keywords":"iptables, docker, troubleshooting","wordcount":2496,"url":"https:\/\/janrotter.github.io\/posts\/cant_reach_docker_container\/","datePublished":"2022-09-06T22:34:32+02:00","dateModified":"2022-09-06T22:34:32+02:00","publisher":{"@type":"Organization","name":""},"author":{"@type":"Person","name":"Jan Rotter"},"description":""}</script></head><body data-header-desktop=fixed data-header-mobile=auto><script type=text/javascript>(window.localStorage&&localStorage.getItem("theme")?localStorage.getItem("theme")==="dark":"light"==="auto"?window.matchMedia("(prefers-color-scheme: dark)").matches:"light"==="dark")&&document.body.setAttribute("theme","dark")</script><div id=mask></div><div class=wrapper><header class=desktop id=header-desktop><div class=header-wrapper><div class=header-title><a href=/ title="Jan Rotter Blog">MiniBlog</a></div><div class=menu><div class=menu-inner><a href=javascript:void(0); class="menu-item theme-switch" title="Switch Theme"><i class="fas fa-adjust fa-fw" aria-hidden=true></i></a></div></div></div></header><header class=mobile id=header-mobile><div class=header-container><div class=header-wrapper><div class=header-title><a href=/ title="Jan Rotter Blog">MiniBlog</a></div><div class=menu-toggle id=menu-toggle-mobile><span></span><span></span><span></span></div></div><div class=menu id=menu-mobile><a href=javascript:void(0); class="menu-item theme-switch" title="Switch Theme"><i class="fas fa-adjust fa-fw" aria-hidden=true></i></a></div></div></header><main class=main><div class=container><div class=toc id=toc-auto><h2 class=toc-title>Contents</h2><div class=toc-content id=toc-content-auto></div></div><article class="page single"><h1 class="single-title animate__animated animate__flipInX">I can't reach a published container port from outside of the host!</h1><div class=post-meta><div class=post-meta-line><span class=post-author><a href=/ title=Author rel=author class=author><i class="fas fa-user-circle fa-fw" aria-hidden=true></i>Jan Rotter</a></span></div><div class=post-meta-line><i class="far fa-calendar-alt fa-fw" aria-hidden=true></i>&nbsp;<time datetime=2022-09-06>2022-09-06</time>&nbsp;<i class="fas fa-pencil-alt fa-fw" aria-hidden=true></i>&nbsp;2496 words&nbsp;
+<i class="far fa-clock fa-fw" aria-hidden=true></i>&nbsp;12 minutes&nbsp;</div></div><div class="details toc" id=toc-static data-kept><div class="details-summary toc-title"><span>Contents</span>
+<span><i class="details-icon fas fa-angle-right" aria-hidden=true></i></span></div><div class="details-content toc-content" id=toc-content-static><nav id=TableOfContents><ul><li><a href=#the-setup>The setup</a></li><li><a href=#is-it-the-container>Is it the container?</a></li><li><a href=#is-it-the-port-mapping>Is it the port mapping?</a></li><li><a href=#is-it-the-router>Is it the router?</a></li><li><a href=#is-it-the-dockerhost>Is it the <code>dockerhost</code>?</a></li><li><a href=#lets-take-a-look-at-the-firewall>Let&rsquo;s take a look at the firewall</a></li><li><a href=#dear-firewall-how-should-you-be-debugged>Dear firewall, how should you be debugged?</a></li><li><a href=#what-happened>What happened?</a></li><li><a href=#summary>Summary</a></li></ul></nav></div></div><div class=content id=content><p>I have installed Ubuntu Server 22.04 on one of my machines and tried to launch a
+simple docker-compose stack.</p><p><code>docker-compose</code> came installed together with the <code>docker</code> snap, which resulted
+in some issues (same as <a href=https://askubuntu.com/questions/1374480/docker-compose-installed-with-snap-gives-error-on-yml-file target=_blank rel="noopener noreffer">here</a>),
+so I quickly decided to simply replace that with the <code>docker.io</code> APT package:</p><pre tabindex=0><code># snap remove docker
+docker removed
+# apt-get install -y docker.io docker-compose
+...
+# docker ps
+CONTAINER ID   IMAGE     COMMAND   CREATED   STATUS    PORTS     NAMES
+#
+</code></pre><p>Done.</p><p>Now back to running my precious containers&mldr;
+<code>docker-compose up</code>, I&rsquo;m going to the right url in my browser and&mldr; nothing.</p><p>Ok, this can&rsquo;t be hard to fix, right? Right?!</p><p>Follow along, let&rsquo;s see how soon you&rsquo;ll figure out what the issue is!</p><h2 id=the-setup>The setup</h2><p>Firstly, let&rsquo;s make it clear what the setup is. The Ubuntu box is a vanilla
+installation, the only additional steps were the removal of the <code>docker</code> snap
+and the installation of the <code>docker.io</code> package. I&rsquo;m running a container with an
+exposed (published) port and trying to access it from my workstation.</p><p>The Ubuntu box (let&rsquo;s call it <code>dockerhost</code>) and my workstation (<code>mypc</code>) are in
+different subnets, with a router in between that should allow the traffic to
+pass between them.</p><div class="goat svg-container"><svg xmlns="http://www.w3.org/2000/svg" font-family="Menlo,Lucida Console,monospace" viewBox="0 0 560 73"><g transform="translate(8,16)"><path d="M0 16H56" fill="none" stroke="currentcolor"/><path d="M216 16h72" fill="none" stroke="currentcolor"/><path d="M440 16H544" fill="none" stroke="currentcolor"/><path d="M64 32H208" fill="none" stroke="currentcolor"/><path d="M296 32H432" fill="none" stroke="currentcolor"/><path d="M0 48H56" fill="none" stroke="currentcolor"/><path d="M216 48h72" fill="none" stroke="currentcolor"/><path d="M440 48H544" fill="none" stroke="currentcolor"/><path d="M0 16V48" fill="none" stroke="currentcolor"/><path d="M56 16V48" fill="none" stroke="currentcolor"/><path d="M216 16V48" fill="none" stroke="currentcolor"/><path d="M288 16V48" fill="none" stroke="currentcolor"/><path d="M440 16V48" fill="none" stroke="currentcolor"/><path d="M544 16V48" fill="none" stroke="currentcolor"/><text text-anchor="middle" x="16" y="36" fill="currentcolor" style="font-size:1em">m</text><text text-anchor="middle" x="24" y="36" fill="currentcolor" style="font-size:1em">y</text><text text-anchor="middle" x="32" y="36" fill="currentcolor" style="font-size:1em">p</text><text text-anchor="middle" x="40" y="36" fill="currentcolor" style="font-size:1em">c</text><text text-anchor="middle" x="80" y="20" fill="currentcolor" style="font-size:1em">1</text><text text-anchor="middle" x="88" y="20" fill="currentcolor" style="font-size:1em">9</text><text text-anchor="middle" x="96" y="20" fill="currentcolor" style="font-size:1em">2</text><text text-anchor="middle" x="104" y="20" fill="currentcolor" style="font-size:1em">.</text><text text-anchor="middle" x="112" y="20" fill="currentcolor" style="font-size:1em">1</text><text text-anchor="middle" x="120" y="20" fill="currentcolor" style="font-size:1em">6</text><text text-anchor="middle" x="128" y="20" fill="currentcolor" style="font-size:1em">8</text><text text-anchor="middle" x="136" y="20" fill="currentcolor" style="font-size:1em">.</text><text text-anchor="middle" x="144" y="20" fill="currentcolor" style="font-size:1em">3</text><text text-anchor="middle" x="152" y="20" fill="currentcolor" style="font-size:1em">0</text><text text-anchor="middle" x="160" y="20" fill="currentcolor" style="font-size:1em">.</text><text text-anchor="middle" x="168" y="20" fill="currentcolor" style="font-size:1em">0</text><text text-anchor="middle" x="176" y="20" fill="currentcolor" style="font-size:1em">/</text><text text-anchor="middle" x="184" y="20" fill="currentcolor" style="font-size:1em">2</text><text text-anchor="middle" x="192" y="20" fill="currentcolor" style="font-size:1em">4</text><text text-anchor="middle" x="232" y="36" fill="currentcolor" style="font-size:1em">R</text><text text-anchor="middle" x="240" y="36" fill="currentcolor" style="font-size:1em">o</text><text text-anchor="middle" x="248" y="36" fill="currentcolor" style="font-size:1em">u</text><text text-anchor="middle" x="256" y="36" fill="currentcolor" style="font-size:1em">t</text><text text-anchor="middle" x="264" y="36" fill="currentcolor" style="font-size:1em">e</text><text text-anchor="middle" x="272" y="36" fill="currentcolor" style="font-size:1em">r</text><text text-anchor="middle" x="304" y="20" fill="currentcolor" style="font-size:1em">1</text><text text-anchor="middle" x="312" y="20" fill="currentcolor" style="font-size:1em">9</text><text text-anchor="middle" x="320" y="20" fill="currentcolor" style="font-size:1em">2</text><text text-anchor="middle" x="328" y="20" fill="currentcolor" style="font-size:1em">.</text><text text-anchor="middle" x="336" y="20" fill="currentcolor" style="font-size:1em">1</text><text text-anchor="middle" x="344" y="20" fill="currentcolor" style="font-size:1em">6</text><text text-anchor="middle" x="352" y="20" fill="currentcolor" style="font-size:1em">8</text><text text-anchor="middle" x="360" y="20" fill="currentcolor" style="font-size:1em">.</text><text text-anchor="middle" x="368" y="20" fill="currentcolor" style="font-size:1em">5</text><text text-anchor="middle" x="376" y="20" fill="currentcolor" style="font-size:1em">0</text><text text-anchor="middle" x="384" y="20" fill="currentcolor" style="font-size:1em">.</text><text text-anchor="middle" x="392" y="20" fill="currentcolor" style="font-size:1em">0</text><text text-anchor="middle" x="400" y="20" fill="currentcolor" style="font-size:1em">/</text><text text-anchor="middle" x="408" y="20" fill="currentcolor" style="font-size:1em">2</text><text text-anchor="middle" x="416" y="20" fill="currentcolor" style="font-size:1em">4</text><text text-anchor="middle" x="456" y="36" fill="currentcolor" style="font-size:1em">d</text><text text-anchor="middle" x="464" y="36" fill="currentcolor" style="font-size:1em">o</text><text text-anchor="middle" x="472" y="36" fill="currentcolor" style="font-size:1em">c</text><text text-anchor="middle" x="480" y="36" fill="currentcolor" style="font-size:1em">k</text><text text-anchor="middle" x="488" y="36" fill="currentcolor" style="font-size:1em">e</text><text text-anchor="middle" x="496" y="36" fill="currentcolor" style="font-size:1em">r</text><text text-anchor="middle" x="504" y="36" fill="currentcolor" style="font-size:1em">h</text><text text-anchor="middle" x="512" y="36" fill="currentcolor" style="font-size:1em">o</text><text text-anchor="middle" x="520" y="36" fill="currentcolor" style="font-size:1em">s</text><text text-anchor="middle" x="528" y="36" fill="currentcolor" style="font-size:1em">t</text></g></svg></div><p>Unfortunately for some reason the connection simply times out&mldr;</p><h2 id=is-it-the-container>Is it the container?</h2><p>I haven&rsquo;t used the container from the docker-compose definition before, so I&rsquo;m
+replacing it with something trivial to see if that helps:</p><pre tabindex=0><code>root@dockerhost:~# docker run -d --rm -p 8080:80 nginx
+948a0b20cc19bf0730503b9f520d999ad2a2c2faf8201dd6326acd6469655eb0
+root@dockerhost:~# docker ps
+CONTAINER ID   IMAGE     COMMAND                  CREATED         STATUS         PORTS                                   NAMES
+948a0b20cc19   nginx     &#34;/docker-entrypoint.…&#34;   6 seconds ago   Up 5 seconds   0.0.0.0:8080-&gt;80/tcp, :::8080-&gt;80/tcp   wonderful_shockley
+</code></pre><p>Still no luck:</p><pre tabindex=0><code>mypc$ curl -v 192.168.50.254:8080
+*   Trying 192.168.50.254:8080...
+^C⏎                                                                                
+</code></pre><h2 id=is-it-the-port-mapping>Is it the port mapping?</h2><p>As you can see above, the port is mapped on all IPs, so that&rsquo;s not the problem.</p><p>Can I reach the nginx from the <code>dockerhost</code> itself? Let&rsquo;s see:</p><pre tabindex=0><code>root@dockerhost:~# curl localhost:8080
+&lt;!DOCTYPE html&gt;
+&lt;html&gt;
+&lt;head&gt;
+&lt;title&gt;Welcome to nginx!&lt;/title&gt;
+&lt;style&gt;
+html { color-scheme: light dark; }
+body { width: 35em; margin: 0 auto;
+font-family: Tahoma, Verdana, Arial, sans-serif; }
+&lt;/style&gt;
+&lt;/head&gt;
+&lt;body&gt;
+&lt;h1&gt;Welcome to nginx!&lt;/h1&gt;
+&lt;p&gt;If you see this page, the nginx web server is successfully installed and
+working. Further configuration is required.&lt;/p&gt;
+
+&lt;p&gt;For online documentation and support please refer to
+&lt;a href=&#34;http://nginx.org/&#34;&gt;nginx.org&lt;/a&gt;.&lt;br/&gt;
+Commercial support is available at
+&lt;a href=&#34;http://nginx.com/&#34;&gt;nginx.com&lt;/a&gt;.&lt;/p&gt;
+
+&lt;p&gt;&lt;em&gt;Thank you for using nginx.&lt;/em&gt;&lt;/p&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+root@dockerhost:~# 
+</code></pre><p>That one looks good.</p><p>Maybe it&rsquo;s something between the <code>dockerhost</code> and <code>mypc</code>?</p><h2 id=is-it-the-router>Is it the router?</h2><p>So how does the connection between the <code>dockerhost</code> and <code>mypc</code> look like? I&rsquo;m
+configuring the <code>dockerhost</code> over ssh, so it should be fine, but just to be sure:</p><pre tabindex=0><code>mypc$ ping 192.168.50.254
+PING 192.168.50.254 (192.168.50.254) 56(84) bytes of data.
+64 bytes from 192.168.50.254: icmp_seq=1 ttl=63 time=0.764 ms
+64 bytes from 192.168.50.254: icmp_seq=2 ttl=63 time=0.638 ms
+64 bytes from 192.168.50.254: icmp_seq=3 ttl=63 time=0.628 ms
+^C
+--- 192.168.50.254 ping statistics ---
+3 packets transmitted, 3 received, 0% packet loss, time 2071ms
+rtt min/avg/max/mdev = 0.628/0.676/0.764/0.061 ms
+</code></pre><p>Maybe something is blocking this particular port? I&rsquo;ll kill the nginx container for a while and replace it with netcat on the <code>dockerhost</code>:</p><pre tabindex=0><code>root@dockerhost:~# nc -l 8080
+</code></pre><p>and connect to it from <code>mypc</code>:</p><pre tabindex=0><code>mypc$ nc 192.168.50.254 8080
+ping
+pong
+</code></pre><p>It works without any issues, I&rsquo;m able to send and receive data.</p><h2 id=is-it-the-dockerhost>Is it the <code>dockerhost</code>?</h2><p>Ok, what do we know so far? The packets are sent correctly from <code>mypc</code> and they are
+able to reach the <code>dockerhost</code>. For non-docker workloads, the transmission works
+fine. We are also able to reach the container from the localhost. What is the
+issue then?</p><p>I&rsquo;ll inspect the traffic on the <code>dockerhost</code> itself. I&rsquo;ll run a tcpdump to
+capture the traffic on all interfaces and run <code>curl localhost:8080</code>:</p><pre tabindex=0><code>root@dockerhost:~# tcpdump -q -n -i any port 8080 or port 80
+tcpdump: data link type LINUX_SLL2
+tcpdump: verbose output suppressed, use -v[v]... for full protocol decode
+listening on any, link-type LINUX_SLL2 (Linux cooked v2), snapshot length 262144 bytes
+21:41:49.118701 lo    In  IP 127.0.0.1.40892 &gt; 127.0.0.1.8080: tcp 0
+21:41:49.118855 lo    In  IP 127.0.0.1.8080 &gt; 127.0.0.1.40892: tcp 0
+21:41:49.118891 lo    In  IP 127.0.0.1.40892 &gt; 127.0.0.1.8080: tcp 0
+21:41:49.119096 lo    In  IP 127.0.0.1.40892 &gt; 127.0.0.1.8080: tcp 78
+21:41:49.119213 lo    In  IP 127.0.0.1.8080 &gt; 127.0.0.1.40892: tcp 0
+21:41:49.119289 docker0 Out IP 172.17.0.1.35062 &gt; 172.17.0.2.80: tcp 0
+21:41:49.119302 vethfdb534f Out IP 172.17.0.1.35062 &gt; 172.17.0.2.80: tcp 0
+21:41:49.119335 vethfdb534f P   IP 172.17.0.2.80 &gt; 172.17.0.1.35062: tcp 0
+21:41:49.119335 docker0 In  IP 172.17.0.2.80 &gt; 172.17.0.1.35062: tcp 0
+21:41:49.119379 docker0 Out IP 172.17.0.1.35062 &gt; 172.17.0.2.80: tcp 0
+21:41:49.119384 vethfdb534f Out IP 172.17.0.1.35062 &gt; 172.17.0.2.80: tcp 0
+21:41:49.119698 docker0 Out IP 172.17.0.1.35062 &gt; 172.17.0.2.80: tcp 78
+21:41:49.119704 vethfdb534f Out IP 172.17.0.1.35062 &gt; 172.17.0.2.80: tcp 78
+21:41:49.119733 vethfdb534f P   IP 172.17.0.2.80 &gt; 172.17.0.1.35062: tcp 0
+21:41:49.119733 docker0 In  IP 172.17.0.2.80 &gt; 172.17.0.1.35062: tcp 0
+21:41:49.119993 vethfdb534f P   IP 172.17.0.2.80 &gt; 172.17.0.1.35062: tcp 238
+21:41:49.119993 docker0 In  IP 172.17.0.2.80 &gt; 172.17.0.1.35062: tcp 238
+21:41:49.120024 docker0 Out IP 172.17.0.1.35062 &gt; 172.17.0.2.80: tcp 0
+21:41:49.120029 vethfdb534f Out IP 172.17.0.1.35062 &gt; 172.17.0.2.80: tcp 0
+21:41:49.120076 vethfdb534f P   IP 172.17.0.2.80 &gt; 172.17.0.1.35062: tcp 615
+21:41:49.120082 lo    In  IP 127.0.0.1.8080 &gt; 127.0.0.1.40892: tcp 238
+21:41:49.120076 docker0 In  IP 172.17.0.2.80 &gt; 172.17.0.1.35062: tcp 615
+21:41:49.120098 docker0 Out IP 172.17.0.1.35062 &gt; 172.17.0.2.80: tcp 0
+21:41:49.120102 vethfdb534f Out IP 172.17.0.1.35062 &gt; 172.17.0.2.80: tcp 0
+21:41:49.120110 lo    In  IP 127.0.0.1.40892 &gt; 127.0.0.1.8080: tcp 0
+21:41:49.120343 lo    In  IP 127.0.0.1.8080 &gt; 127.0.0.1.40892: tcp 615
+21:41:49.120364 lo    In  IP 127.0.0.1.40892 &gt; 127.0.0.1.8080: tcp 0
+21:41:49.121188 lo    In  IP 127.0.0.1.40892 &gt; 127.0.0.1.8080: tcp 0
+21:41:49.121558 docker0 Out IP 172.17.0.1.35062 &gt; 172.17.0.2.80: tcp 0
+21:41:49.121569 vethfdb534f Out IP 172.17.0.1.35062 &gt; 172.17.0.2.80: tcp 0
+21:41:49.123905 vethfdb534f P   IP 172.17.0.2.80 &gt; 172.17.0.1.35062: tcp 0
+21:41:49.123905 docker0 In  IP 172.17.0.2.80 &gt; 172.17.0.1.35062: tcp 0
+21:41:49.124004 docker0 Out IP 172.17.0.1.35062 &gt; 172.17.0.2.80: tcp 0
+21:41:49.124012 vethfdb534f Out IP 172.17.0.1.35062 &gt; 172.17.0.2.80: tcp 0
+21:41:49.124627 lo    In  IP 127.0.0.1.8080 &gt; 127.0.0.1.40892: tcp 0
+21:41:49.124663 lo    In  IP 127.0.0.1.40892 &gt; 127.0.0.1.8080: tcp 0
+^C
+36 packets captured
+50 packets received by filter
+0 packets dropped by kernel
+root@dockerhost:~#
+</code></pre><p>The flags used, are (see the <a href=https://www.tcpdump.org/manpages/tcpdump.1.html target=_blank rel="noopener noreffer">manual</a> for details):</p><pre tabindex=0><code>-q - quiet output, suppress the details
+-n - don&#39;t convert addresses to names
+-i interface - select the interface, any can be used to select all
+</code></pre><p>and the filter for ports 8080 or 80 is intended to capture the traffic coming from the <em>outside</em> (the left side of the port mapping of the docker container) and the traffic going into the container itself (the right side).</p><p>That obviously worked fine, but please do take a look. It&rsquo;s really cool to see
+how the traffic flows through various interfaces and the <code>docker0</code> bridge!</p><p>Now, let&rsquo;s run the same tcpdump but launch the <code>curl</code> from <code>mypc</code>:</p><pre tabindex=0><code>root@dockerhost:~# tcpdump -q -n -i any port 8080 or port 80
+tcpdump: data link type LINUX_SLL2
+tcpdump: verbose output suppressed, use -v[v]... for full protocol decode
+listening on any, link-type LINUX_SLL2 (Linux cooked v2), snapshot length 262144 bytes
+21:43:37.599268 enp2s0 In  IP 192.168.30.252.56084 &gt; 192.168.50.254.8080: tcp 0
+21:43:38.660223 enp2s0 In  IP 192.168.30.252.56084 &gt; 192.168.50.254.8080: tcp 0
+21:43:40.708210 enp2s0 In  IP 192.168.30.252.56084 &gt; 192.168.50.254.8080: tcp 0
+^C
+3 packets captured
+5 packets received by filter
+0 packets dropped by kernel
+root@dockerhost:~# 
+</code></pre><p>Nothing. Well, almost nothing. The packets do come in, but then are
+swallawed somewhere. The firewall? But shouldn&rsquo;t that work reasonably well out
+of the box?</p><h2 id=lets-take-a-look-at-the-firewall>Let&rsquo;s take a look at the firewall</h2><p>It&rsquo;s time to look at the firewall. I know you would have done that sooner, but let&rsquo;s take a look together ;)</p><p>The ufw is disabled:</p><pre tabindex=0><code>root@dockerhost:~# ufw status
+Status: inactive
+root@dockerhost:~#
+</code></pre><p>and the iptables look like this:</p><pre tabindex=0><code>root@dockerhost:~# iptables -L -v -n
+# Warning: iptables-legacy tables present, use iptables-legacy to see them
+Chain INPUT (policy ACCEPT 0 packets, 0 bytes)
+ pkts bytes target     prot opt in     out     source               destination         
+
+Chain FORWARD (policy ACCEPT 0 packets, 0 bytes)
+ pkts bytes target     prot opt in     out     source               destination         
+   57  3420 DOCKER-USER  all  --  *      *       0.0.0.0/0            0.0.0.0/0           
+   57  3420 DOCKER-ISOLATION-STAGE-1  all  --  *      *       0.0.0.0/0            0.0.0.0/0           
+    0     0 ACCEPT     all  --  *      docker0  0.0.0.0/0            0.0.0.0/0            ctstate RELATED,ESTABLISHED
+   57  3420 DOCKER     all  --  *      docker0  0.0.0.0/0            0.0.0.0/0           
+    0     0 ACCEPT     all  --  docker0 !docker0  0.0.0.0/0            0.0.0.0/0           
+    0     0 ACCEPT     all  --  docker0 docker0  0.0.0.0/0            0.0.0.0/0           
+
+Chain OUTPUT (policy ACCEPT 0 packets, 0 bytes)
+ pkts bytes target     prot opt in     out     source               destination         
+
+Chain DOCKER (1 references)
+ pkts bytes target     prot opt in     out     source               destination         
+   22  1320 ACCEPT     tcp  --  !docker0 docker0  0.0.0.0/0            172.17.0.2           tcp dpt:80
+
+Chain DOCKER-ISOLATION-STAGE-1 (1 references)
+ pkts bytes target     prot opt in     out     source               destination         
+    0     0 DOCKER-ISOLATION-STAGE-2  all  --  docker0 !docker0  0.0.0.0/0            0.0.0.0/0           
+   57  3420 RETURN     all  --  *      *       0.0.0.0/0            0.0.0.0/0           
+
+Chain DOCKER-ISOLATION-STAGE-2 (1 references)
+ pkts bytes target     prot opt in     out     source               destination         
+    0     0 DROP       all  --  *      docker0  0.0.0.0/0            0.0.0.0/0           
+    0     0 RETURN     all  --  *      *       0.0.0.0/0            0.0.0.0/0           
+
+Chain DOCKER-USER (1 references)
+ pkts bytes target     prot opt in     out     source               destination         
+   57  3420 RETURN     all  --  *      *       0.0.0.0/0            0.0.0.0/0           
+root@dockerhost:~#
+</code></pre><p>and for the <code>nat</code> chain:</p><pre tabindex=0><code>root@dockerhost:~# iptables -t nat -v -n -L
+# Warning: iptables-legacy tables present, use iptables-legacy to see them
+Chain PREROUTING (policy ACCEPT 0 packets, 0 bytes)
+ pkts bytes target     prot opt in     out     source               destination         
+   63  3852 DOCKER     all  --  *      *       0.0.0.0/0            0.0.0.0/0            ADDRTYPE match dst-type LOCAL
+
+Chain INPUT (policy ACCEPT 0 packets, 0 bytes)
+ pkts bytes target     prot opt in     out     source               destination         
+
+Chain OUTPUT (policy ACCEPT 0 packets, 0 bytes)
+ pkts bytes target     prot opt in     out     source               destination         
+    0     0 DOCKER     all  --  *      *       0.0.0.0/0           !127.0.0.0/8          ADDRTYPE match dst-type LOCAL
+
+Chain POSTROUTING (policy ACCEPT 0 packets, 0 bytes)
+ pkts bytes target     prot opt in     out     source               destination         
+    0     0 MASQUERADE  all  --  *      !docker0  172.17.0.0/16        0.0.0.0/0           
+    0     0 MASQUERADE  tcp  --  *      *       172.17.0.2           172.17.0.2           tcp dpt:80
+
+Chain DOCKER (2 references)
+ pkts bytes target     prot opt in     out     source               destination         
+    0     0 RETURN     all  --  docker0 *       0.0.0.0/0            0.0.0.0/0           
+   22  1320 DNAT       tcp  --  !docker0 *       0.0.0.0/0            0.0.0.0/0            tcp dpt:8080 to:172.17.0.2:80
+root@dockerhost:~#
+</code></pre><p>The policies are all <code>ACCEPT</code> as far as I can see, the <code>DNAT</code> is in place to direct the traffic to our container&mldr; I don&rsquo;t see anything obviously wrong at this point.</p><h2 id=dear-firewall-how-should-you-be-debugged>Dear firewall, how should you be debugged?</h2><p>There is a really good
+<a href=https://backreference.org/2010/06/11/iptables-debugging/ target=_blank rel="noopener noreffer">post</a> on debugging
+the iptables, so I&rsquo;m not going to explain that in detail, but in general it is
+possible to use a <code>TRACE</code> target to log the packet journey through the iptables.</p><p>I don&rsquo;t want to trace all of the packets, because that will make the log
+unreadable, so I&rsquo;ll have to be selective enough and at the same time apply the
+TRACE target as soon as possible. The best fit for that is the <code>raw</code> table, that
+is processed very soon on the packet arrival (<a href=https://upload.wikimedia.org/wikipedia/commons/3/37/Netfilter-packet-flow.svg target=_blank rel="noopener noreffer">see the netfilter packet flow diagram</a>):</p><pre tabindex=0><code>root@dockerhost:~# -A PREROUTING -p tcp -m tcp --dport 8080 -j TRACE
+</code></pre><p>The logs can be found in the <code>/var/log/kern.log</code> or simply in the <code>dmesg</code>.</p><p>What can we see for the <code>curl</code> run from <code>mypc</code>?</p><pre tabindex=0><code># redacted a bit for readability
+[ 1288.683905] TRACE: raw:PREROUTING:policy:1 IN=enp2s0 OUT= MAC=... SRC=192.168.30.252 DST=192.168.50.254 ...
+[ 1288.684048] TRACE: filter:FORWARD:rule:1 IN=enp2s0 OUT=docker0 MAC=... SRC=192.168.30.252 DST=172.17.0.2 ...
+[ 1288.684079] TRACE: filter:DOCKER-USER:return:1 IN=enp2s0 OUT=docker0 MAC=... SRC=192.168.30.252 DST=172.17.0.2 ...
+[ 1288.684104] TRACE: filter:FORWARD:rule:2 IN=enp2s0 OUT=docker0 MAC=... SRC=192.168.30.252 DST=172.17.0.2 ...
+[ 1288.684130] TRACE: filter:DOCKER-ISOLATION-STAGE-1:return:2 IN=enp2s0 OUT=docker0 MAC=... SRC=192.168.30.252 DST=172.17.0.2 ...
+[ 1288.684158] TRACE: filter:FORWARD:rule:4 IN=enp2s0 OUT=docker0 MAC=... SRC=192.168.30.252 DST=172.17.0.2 ...
+[ 1288.684182] TRACE: filter:DOCKER:return:1 IN=enp2s0 OUT=docker0 MAC=... SRC=192.168.30.252 DST=172.17.0.2 ...
+[ 1288.684206] TRACE: filter:FORWARD:policy:7 IN=enp2s0 OUT=docker0 MAC=... SRC=192.168.30.252 DST=172.17.0.2 ...
+</code></pre><p>Ok, the packet goes in, hits the <code>raw</code> table with our <code>TRACE</code> target and then moves to the <code>filter</code> table to go through the <code>FORWARD</code> and <code>DOCKER</code> chains. It ends up using the <code>FORWARD</code> chain policy of the <code>filter</code> table. Can you find it above?</p><p>There is something wrong here though&mldr; Please take a look at the first line:</p><pre tabindex=0><code>... raw:PREROUTING:policy:1 ...
+</code></pre><p>It says, that the packet goes through the <code>raw</code> table, <code>PREROUTING</code> chain and uses the policy which is the rule number 1 (the rule number for the policy will be simply +1 of the last rule number of the chain). How can it be 1 here if we have just added a rule to that chain (the <code>TRACE</code> one)?</p><pre tabindex=0><code>root@dockerhost:~# iptables -t raw -L
+# Warning: iptables-legacy tables present, use iptables-legacy to see them
+Chain PREROUTING (policy ACCEPT)
+target     prot opt source               destination         
+TRACE      tcp  --  anywhere             anywhere             tcp dpt:http-alt
+</code></pre><p>Oh, stop complaining about those <code>iptables-legacy</code> already&mldr; Wait, what?</p><pre tabindex=0><code>root@dockerhost:~# iptables-legacy -t raw -L
+Chain PREROUTING (policy ACCEPT)
+target     prot opt source               destination         
+
+Chain OUTPUT (policy ACCEPT)
+target     prot opt source               destination        
+</code></pre><p>Interesting!</p><p>How about the <code>filter</code> table?</p><pre tabindex=0><code>root@dockerhost:~# iptables-legacy -L
+Chain INPUT (policy ACCEPT)
+target     prot opt source               destination         
+
+Chain FORWARD (policy DROP)
+target     prot opt source               destination         
+DOCKER-USER  all  --  anywhere             anywhere            
+DOCKER-ISOLATION-STAGE-1  all  --  anywhere             anywhere            
+ACCEPT     all  --  anywhere             anywhere             ctstate RELATED,ESTABLISHED
+DOCKER     all  --  anywhere             anywhere            
+ACCEPT     all  --  anywhere             anywhere            
+ACCEPT     all  --  anywhere             anywhere            
+
+Chain OUTPUT (policy ACCEPT)
+target     prot opt source               destination         
+
+Chain DOCKER (1 references)
+target     prot opt source               destination         
+
+Chain DOCKER-ISOLATION-STAGE-1 (1 references)
+target     prot opt source               destination         
+DOCKER-ISOLATION-STAGE-2  all  --  anywhere             anywhere            
+RETURN     all  --  anywhere             anywhere            
+
+Chain DOCKER-ISOLATION-STAGE-2 (1 references)
+target     prot opt source               destination         
+DROP       all  --  anywhere             anywhere            
+RETURN     all  --  anywhere             anywhere            
+
+Chain DOCKER-USER (1 references)
+target     prot opt source               destination         
+RETURN     all  --  anywhere             anywhere            
+root@dockerhost:~#
+</code></pre><p>Can you see that <code>DROP</code> policy in the <code>FORWARD</code> chain? I&rsquo;ll change it to <code>ACCEPT</code>:</p><pre tabindex=0><code>root@dockerhost:~# iptables-legacy -P FORWARD ACCEPT
+</code></pre><p>and retry:</p><pre tabindex=0><code>mypc$ curl -v 192.168.50.254:8080
+*   Trying 192.168.50.254:8080...
+* Connected to 192.168.50.254 (192.168.50.254) port 8080 (#0)
+&gt; GET / HTTP/1.1
+&gt; Host: 192.168.50.254:8080
+&gt; User-Agent: curl/7.84.0
+&gt; Accept: */*
+&gt; 
+...
+</code></pre><p>It works!</p><h2 id=what-happened>What happened?</h2><p>It seems that the docker snap uses legacy iptables to configure the firewall,
+whereas the one installed with APT configured it with the currently used
+nftables. I haven&rsquo;t been able to quickly find a good explanation of how iptables
+and nftables work when combined, only advices not to configure the rules for
+both at the same time.</p><p>How to fix it? Well, have you tried forcing an (un)expected reboot? :) This will
+cleanup the legacy iptables leftovers made by the docker snap and leave only the
+nftables filters.</p><h2 id=summary>Summary</h2><p>In this post we went together through debugging a seemingly trivial issue with
+the docker networking. While the root cause is not something that I would
+expect to happen on any of the production machines, I believe that it was a
+great educational excercise and an opportunity to look closer into the Linux
+firewall and the tools that might help you troubleshoot connectivity issues in
+the future.</p><p>Thank you for reading and have a great day!</p></div><div class=post-footer id=post-footer><div class=post-info><div class=post-info-line><div class=post-info-mod><span>Updated on 2022-09-06</span></div></div><div class=post-info-line><div class=post-info-md></div><div class=post-info-share><span><a href=javascript:void(0); title="Share on Twitter" data-sharer=twitter data-url=https://janrotter.github.io/posts/cant_reach_docker_container/ data-title="I can't reach a published container port from outside of the host!" data-hashtags=iptables,docker,troubleshooting><i class="fab fa-twitter fa-fw" aria-hidden=true></i></a><a href=javascript:void(0); title="Share on Facebook" data-sharer=facebook data-url=https://janrotter.github.io/posts/cant_reach_docker_container/ data-hashtag=iptables><i class="fab fa-facebook-square fa-fw" aria-hidden=true></i></a><a href=javascript:void(0); title="Share on Hacker News" data-sharer=hackernews data-url=https://janrotter.github.io/posts/cant_reach_docker_container/ data-title="I can't reach a published container port from outside of the host!"><i class="fab fa-hacker-news fa-fw" aria-hidden=true></i></a></span></div></div></div><div class=post-info-more><section class=post-tags><i class="fas fa-tags fa-fw" aria-hidden=true></i>&nbsp;<a href=/tags/iptables/>iptables</a>,&nbsp;<a href=/tags/docker/>docker</a>,&nbsp;<a href=/tags/troubleshooting/>troubleshooting</a></section><section><span><a href=javascript:void(0); onclick=window.history.back()>Back</a></span>&nbsp;|&nbsp;<span><a href=/>Home</a></span></section></div><div class=post-nav><a href=/posts/mikrotik/ class=prev rel=prev title="My Basic MikroTik hEX S Setup"><i class="fas fa-angle-left fa-fw" aria-hidden=true></i>My Basic MikroTik hEX S Setup</a></div></div></article></div></main><footer class=footer><div class=footer-container><div class=footer-line>Powered by <a href=https://gohugo.io/ target=_blank rel="noopener noreffer" title="Hugo 0.101.0">Hugo</a> | Theme - <a href=https://github.com/dillonzq/LoveIt target=_blank rel="noopener noreffer" title="LoveIt 0.2.11"><i class="far fa-kiss-wink-heart fa-fw" aria-hidden=true></i> LoveIt</a></div><div class=footer-line itemscope itemtype=http://schema.org/CreativeWork><i class="far fa-copyright fa-fw" aria-hidden=true></i><span itemprop=copyrightYear>2022</span><span class=author itemprop=copyrightHolder>&nbsp;<a href=/ target=_blank>Jan Rotter</a></span></div></div></footer></div><div id=fixed-buttons><a href=# id=back-to-top class=fixed-button title="Back to Top"><i class="fas fa-arrow-up fa-fw" aria-hidden=true></i>
+</a><a href=# id=view-comments class=fixed-button title="View Comments"><i class="fas fa-comment fa-fw" aria-hidden=true></i></a></div><script type=text/javascript src=https://cdn.jsdelivr.net/npm/lazysizes@5.3.2/lazysizes.min.js></script><script type=text/javascript src=https://cdn.jsdelivr.net/npm/clipboard@2.0.11/dist/clipboard.min.js></script><script type=text/javascript src=https://cdn.jsdelivr.net/npm/sharer.js@0.5.1/sharer.min.js></script><script type=text/javascript>window.config={code:{copyTitle:"Copy to clipboard",maxShownLines:50},comment:{}}</script><script type=text/javascript src=/js/theme.min.js></script></body></html>
